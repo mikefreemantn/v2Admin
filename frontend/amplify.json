@@ -1,0 +1,5 @@
+{
+  "framework": "nextjs",
+  "path": "/",
+  "entrypoint": "index.html"
+}

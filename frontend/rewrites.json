@@ -1,0 +1,22 @@
+[
+  {
+    "source": "/<*>",
+    "destination": "/index.html"
+  },
+  {
+    "source": "/login",
+    "destination": "/login/index.html"
+  },
+  {
+    "source": "/dashboard",
+    "destination": "/dashboard/index.html"
+  },
+  {
+    "source": "/dashboard/users/:email",
+    "destination": "/dashboard/users/[email]/index.html"
+  },
+  {
+    "source": "/api/proxy",
+    "destination": "/api/proxy"
+  }
+]

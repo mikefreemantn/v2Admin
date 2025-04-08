@@ -1,0 +1,1055 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { 
+  AlertCircle, 
+  Loader2, 
+  ArrowLeft,
+  ChevronRight,
+  RefreshCw,
+  Users,
+  Copy,
+  Coins,
+  CalendarDays,
+  Clock,
+  Key,
+  AlertTriangle,
+  Edit,
+  Plus,
+  Save,
+  X
+} from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { getCurrentUser } from 'aws-amplify/auth';
+import { configureAmplifyClient } from '@/lib/amplifyClient';
+import { Button } from '@/components/ui/button';
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Badge } from "@/components/ui/badge";
+import { format } from 'date-fns';
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/use-toast";
+
+// API key for accessing the ReIntent API
+const API_KEY = 'ri_5437c19aa7de';
+const API_BASE_URL = 'https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1';
+
+// Number of items per page for credit history pagination
+const ITEMS_PER_PAGE = 10;
+
+// User type definition
+interface User {
+  user_id: string;
+  email: string;
+  access_key: string;
+  allow_multiple_domains: boolean;
+  created_at: number;
+  updated_at: number;
+  plan_type: string;
+  status: string;
+  credits: number;
+  stripe_customer_id?: string;
+}
+
+// Domain usage type definition
+interface DomainUsage {
+  users: {
+    user_id: string;
+    email: string;
+    access_key: string;
+    domains: string[];
+    domain_count: number;
+    status: string;
+    allow_multiple_domains: boolean;
+  }[];
+  domain_counts: {
+    [domain: string]: number;
+  };
+}
+
+// Credit transaction type definition
+interface CreditTransaction {
+  service: string;
+  user_id: string;
+  action_type: string;
+  status: string;
+  timestamp: number;
+  amount: number;
+  source_domain: string;
+  date: string;
+}
+
+export default function UserProfilePage({ params }: { params: { email: string } }) {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [domainUsage, setDomainUsage] = useState<DomainUsage | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreditDialog, setShowCreditDialog] = useState(false);
+  const [creditAmount, setCreditAmount] = useState(10);
+  const [isAddingCredits, setIsAddingCredits] = useState(false);
+  
+  // Function to get styles for different plan types
+  const getPlanTypeStyles = (planType: string): string => {
+    switch (planType.toLowerCase()) {
+      case 'credit_based':
+        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400';
+      case 'subscription':
+        return 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400';
+      case 'free':
+        return 'bg-slate-100 dark:bg-slate-900/30 text-slate-700 dark:text-slate-400';
+      case 'enterprise':
+        return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400';
+      default:
+        return 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-400';
+    }
+  };
+  
+  // Edit user state
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editedUser, setEditedUser] = useState<Partial<User>>({});
+  const [isUpdatingUser, setIsUpdatingUser] = useState(false);
+  
+  // Get toast function
+  const { toast } = useToast();
+
+  // Credit history state
+  const [creditHistory, setCreditHistory] = useState<CreditTransaction[]>([]);
+  const [isLoadingCreditHistory, setIsLoadingCreditHistory] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalHistoryItems, setTotalHistoryItems] = useState(0);
+  const itemsPerPage = ITEMS_PER_PAGE;
+  
+  // Decode the email from URL
+  const decodedEmail = decodeURIComponent(params.email);
+  // Check authentication and fetch user data
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        await configureAmplifyClient();
+        const currentUser = await getCurrentUser();
+        
+        // Fetch user data
+        await fetchUserData(decodedEmail);
+      } catch (err) {
+        console.error('Authentication error:', err);
+        router.push('/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkAuth();
+  }, [decodedEmail, router]);
+  
+  // Fetch user data from API
+  const fetchUserData = async (email: string) => {
+    try {
+      setLoading(true);
+      console.log('Fetching user data for email:', email);
+      
+      // Use proxy endpoint to avoid CORS issues with the correct admin endpoint
+      const response = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          endpoint: `${API_BASE_URL}/admin/users`,
+          method: 'GET',
+          apiKey: API_KEY
+        }),
+      });
+      
+      if (!response.ok) {
+        console.error('API response not OK:', response.status, response.statusText);
+        throw new Error(`Failed to fetch user data: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('API response data:', data);
+      
+      // Find the specific user by email
+      let foundUser = null;
+      
+      // Handle different response formats and find the user with matching email
+      if (data.data && data.data.users && Array.isArray(data.data.users)) {
+        // Proxy wrapped response
+        foundUser = data.data.users.find((user: User) => 
+          user.email.toLowerCase() === email.toLowerCase()
+        );
+        if (foundUser) {
+          console.log('User found (proxy format):', foundUser);
+        }
+      } else if (data.users && Array.isArray(data.users)) {
+        // Direct API response
+        foundUser = data.users.find((user: User) => 
+          user.email.toLowerCase() === email.toLowerCase()
+        );
+        if (foundUser) {
+          console.log('User found (direct format):', foundUser);
+        }
+      }
+      
+      if (foundUser) {
+        setUser(foundUser);
+      } else {
+        console.error('User not found in response for email:', email);
+        setError(`User not found with email: ${email}`);
+      }
+      
+      // If user was found, fetch their credit history and extract domain usage
+      if (foundUser) {
+        // Fetch credit history using the found user's ID
+        await fetchCreditHistory(foundUser.user_id);
+        
+        // Extract domain usage from the initial API response
+        try {
+          console.log('Extracting domain usage for user ID:', foundUser.user_id);
+          
+          // Check if domain_usage exists in the response
+          let domainUsageData = null;
+          
+          if (data.data && data.data.domain_usage) {
+            // Proxy wrapped response
+            domainUsageData = data.data.domain_usage;
+          } else if (data.domain_usage) {
+            // Direct API response
+            domainUsageData = data.domain_usage;
+          }
+          
+          if (domainUsageData) {
+            console.log('Domain usage data found in initial response:', domainUsageData);
+            setDomainUsage(domainUsageData);
+          } else {
+            console.log('No domain usage data found in initial response, will not display domain information');
+          }
+        } catch (domainErr) {
+          console.error('Error processing domain usage data:', domainErr);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error fetching user data:', err);
+      setError(`Failed to fetch user data: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch credit history from API
+  const fetchCreditHistory = async (userId: string) => {
+    try {
+      setIsLoadingCreditHistory(true);
+      console.log('Fetching credit history for user ID:', userId);
+      
+      // Use proxy endpoint to avoid CORS issues with the correct admin endpoint
+      const response = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          endpoint: `${API_BASE_URL}/admin/users/${userId}/credit-history`,
+          method: 'GET',
+          apiKey: API_KEY
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch credit history: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Credit history response:', data);
+      
+      // Check if the response has the expected format
+      if (data.data && data.data.history) {
+        setCreditHistory(data.data.history);
+        setTotalHistoryItems(data.data.history.length || 0);
+      } else if (data.history) {
+        // Direct response format
+        setCreditHistory(data.history);
+        setTotalHistoryItems(data.history.length || 0);
+      } else {
+        // Fallback
+        setCreditHistory([]);
+        setTotalHistoryItems(0);
+        console.error('Unexpected credit history format:', data);
+      }
+    } catch (err: any) {
+      console.error('Error fetching credit history:', err);
+      setError(`Failed to fetch credit history: ${err.message}`);
+    } finally {
+      setIsLoadingCreditHistory(false);
+    }
+  };
+  // Format timestamp to readable date
+  const formatTimestamp = (timestamp: number) => {
+    try {
+      return format(new Date(timestamp * 1000), 'MMM d, yyyy h:mm a');
+    } catch (err) {
+      console.error('Error formatting timestamp:', err);
+      return 'Invalid date';
+    }
+  };
+
+  // Handle adding credits to user
+  const handleAddCredits = async () => {
+    if (!user || !creditAmount) return;
+    
+    try {
+      setIsAddingCredits(true);
+      
+      const response = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          endpoint: `${API_BASE_URL}/admin/users/${user.user_id}`,
+          method: 'PUT',
+          apiKey: API_KEY,
+          data: {
+            credits: user.credits + creditAmount
+          }
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to add credits: ${response.status}`);
+      }
+      
+      // Update user state with new credits
+      setUser({
+        ...user,
+        credits: user.credits + creditAmount
+      });
+      
+      // Close dialog and reset credit amount
+      setShowCreditDialog(false);
+      setCreditAmount(10);
+      
+      // Refresh credit history
+      await fetchCreditHistory(user.user_id);
+      
+    } catch (err: any) {
+      console.error('Error adding credits:', err);
+      setError(`Failed to add credits: ${err.message}`);
+    } finally {
+      setIsAddingCredits(false);
+    }
+  };
+
+  // Handle toggling user status (active/inactive)
+  const handleToggleStatus = async () => {
+    if (!user) return;
+    
+    try {
+      const newStatus = user.status === 'active' ? 'inactive' : 'active';
+      
+      const response = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          endpoint: `${API_BASE_URL}/admin/users/${user.user_id}`,
+          method: 'PUT',
+          apiKey: API_KEY,
+          data: {
+            status: newStatus
+          }
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update status: ${response.status}`);
+      }
+      
+      // Update user state with new status
+      setUser({
+        ...user,
+        status: newStatus
+      });
+      
+    } catch (err: any) {
+      console.error('Error updating user status:', err);
+      setError(`Failed to update status: ${err.message}`);
+    }
+  };
+
+  // Handle deleting user
+  const handleDeleteUser = async () => {
+    if (!user) return;
+    
+    // Confirm deletion
+    if (!window.confirm(`Are you sure you want to delete ${user.email}? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          endpoint: `${API_BASE_URL}/admin/users/${user.user_id}/delete`,
+          method: 'DELETE',
+          apiKey: API_KEY
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete user: ${response.status}`);
+      }
+      
+      // Redirect to users list
+      router.push('/dashboard/users');
+      
+    } catch (err: any) {
+      console.error('Error deleting user:', err);
+      setError(`Failed to delete user: ${err.message}`);
+    }
+  };
+
+  // Handle credit amount change
+  const handleCreditAmountChange = (value: number) => {
+    setCreditAmount(Math.max(0, value));
+  };
+  
+  // Initialize edit form with current user data
+  const initializeEditForm = () => {
+    if (user) {
+      setEditedUser({
+        status: user.status,
+        credits: user.credits,
+        plan_type: user.plan_type,
+        allow_multiple_domains: user.allow_multiple_domains
+      });
+    }
+    setShowEditDialog(true);
+  };
+  
+  // Handle form field changes
+  const handleEditFormChange = (field: keyof User, value: string | number | boolean) => {
+    setEditedUser(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  
+  // Update user data
+  const handleUpdateUser = async () => {
+    if (!user) return;
+    
+    setIsUpdatingUser(true);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/users/${user.user_id}?key=${API_KEY}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editedUser),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      // Update local user state with the edited values
+      setUser(prev => prev ? { ...prev, ...editedUser } : null);
+      
+      toast({
+        title: "User updated successfully",
+        description: "The user's information has been updated.",
+      });
+      
+      setShowEditDialog(false);
+    } catch (err) {
+      console.error('Error updating user:', err);
+      toast({
+        title: "Failed to update user",
+        description: "There was an error updating the user's information.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingUser(false);
+    }
+  };
+
+  // Handle back button click
+  const handleBackClick = () => {
+    router.push('/dashboard');
+  };
+
+  // Render function
+  return (
+    <div className="container mx-auto py-6 space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex justify-between items-center">
+        <Breadcrumb className="mb-4">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/dashboard" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">Dashboard</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator>
+              <ChevronRight className="h-4 w-4 text-indigo-400 dark:text-indigo-600" />
+            </BreadcrumbSeparator>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/dashboard" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">Users</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator>
+              <ChevronRight className="h-4 w-4 text-indigo-400 dark:text-indigo-600" />
+            </BreadcrumbSeparator>
+            <BreadcrumbItem>
+              <BreadcrumbPage className="text-slate-600 dark:text-slate-400">{decodedEmail}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <Button variant="outline" size="sm" onClick={handleBackClick} className="flex items-center gap-1">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Users
+        </Button>
+      </div>
+
+      {/* Loading and Error States */}
+      {loading ? (
+        <Card className="border-0 shadow-md bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950 dark:to-gray-900 overflow-hidden">
+          <CardContent className="flex flex-col items-center justify-center p-12">
+            <Loader2 className="h-12 w-12 animate-spin text-indigo-600 dark:text-indigo-400 mb-4" />
+            <p className="text-indigo-600 dark:text-indigo-400">Loading user data...</p>
+          </CardContent>
+        </Card>
+      ) : error ? (
+        <Card className="border-0 shadow-md bg-gradient-to-br from-rose-50 to-white dark:from-rose-950 dark:to-gray-900 overflow-hidden">
+          <CardContent className="flex flex-col items-center justify-center p-12">
+            <AlertCircle className="h-12 w-12 text-rose-600 dark:text-rose-400 mb-4" />
+            <h3 className="text-xl font-bold text-rose-600 dark:text-rose-400 mb-2">Error Loading User</h3>
+            <p className="text-rose-600 dark:text-rose-400">{error}</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* User Profile Card */}
+          <Card className="border-0 shadow-md bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950 dark:to-gray-900 overflow-hidden">
+            <CardContent className="p-0">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+                {/* User Info */}
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-indigo-400 dark:to-violet-400">User Profile</h2>
+              <p className="text-indigo-600 dark:text-indigo-400">User details and account information</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              <div className="flex flex-col space-y-1">
+                <Label className="text-xs text-slate-600 dark:text-slate-400">Email</Label>
+                <div className="flex items-center">
+                  <span className="font-medium">{user?.email}</span>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6 ml-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                    onClick={() => {
+                      navigator.clipboard.writeText(user?.email || '');
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <Label className="text-xs text-slate-600 dark:text-slate-400">User ID</Label>
+                <div className="flex items-center">
+                  <span className="font-medium text-indigo-700 dark:text-indigo-300">{user?.user_id}</span>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6 ml-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                    onClick={() => {
+                      navigator.clipboard.writeText(user?.user_id || '');
+                      toast({
+                        title: "Copied to clipboard",
+                        description: "User ID has been copied to clipboard",
+                      });
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <Label className="text-xs text-slate-600 dark:text-slate-400">API Key</Label>
+                <div className="flex items-center">
+                  <span className="font-medium text-blue-700 dark:text-blue-300 font-mono">{user?.access_key}</span>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6 ml-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    onClick={() => {
+                      navigator.clipboard.writeText(user?.access_key || '');
+                      toast({
+                        title: "Copied to clipboard",
+                        description: "API Key has been copied to clipboard",
+                      });
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <Label className="text-xs text-slate-600 dark:text-slate-400">Status</Label>
+                <div className="flex items-center">
+                  <Badge 
+                    className={`capitalize ${user?.status === 'active' 
+                      ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' 
+                      : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800'}`}
+                  >
+                    {user?.status}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <Label className="text-xs text-slate-600 dark:text-slate-400">Plan Type</Label>
+                <div className="flex items-center">
+                  <Badge variant="outline" className={`capitalize ${getPlanTypeStyles(user?.plan_type || '')}`}>
+                    {user?.plan_type || 'No plan'}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <Label className="text-xs text-slate-600 dark:text-slate-400">Credits</Label>
+                <div className="flex items-center">
+                  <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800">
+                    <Coins className="mr-1 h-3 w-3" />
+                    {user?.credits.toFixed(2)}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <Label className="text-xs text-slate-600 dark:text-slate-400">Created</Label>
+                <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
+                  <CalendarDays className="mr-1 h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                  {user?.created_at ? formatTimestamp(user.created_at) : 'Unknown'}
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <Label className="text-xs text-slate-600 dark:text-slate-400">Last Updated</Label>
+                <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
+                  <Clock className="mr-1 h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+                  {user?.updated_at ? formatTimestamp(user.updated_at) : 'Unknown'}
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <Label className="text-xs text-slate-600 dark:text-slate-400">Multiple Domains</Label>
+                <div className="flex items-center">
+                  <Badge 
+                    className={`capitalize ${user?.allow_multiple_domains 
+                      ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' 
+                      : 'bg-slate-50 dark:bg-slate-900/20 text-slate-700 dark:text-slate-400 border border-slate-200 dark:border-slate-800'}`}
+                  >
+                    {user?.allow_multiple_domains ? 'Allowed' : 'Not Allowed'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Domain Usage */}
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">Domain Usage</h2>
+              <p className="text-blue-600 dark:text-blue-400">Domains used by this user</p>
+            </div>
+
+            {domainUsage ? (
+              <div className="space-y-4">
+                {domainUsage.users && domainUsage.users.length > 0 && domainUsage.users[0].domains && domainUsage.users[0].domains.length > 0 ? (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600 dark:text-slate-400">Registered Domains</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {domainUsage.users[0].domains.map((domain, index) => (
+                        <Badge key={index} variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+                          {domain}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground italic">No domains registered</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-muted-foreground italic">No domain usage information available</p>
+            )}
+          </div>
+
+          {/* User Actions */}
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-bold">User Actions</h2>
+              <p className="text-muted-foreground">Manage this user account</p>
+            </div>
+
+            <div className="space-y-4">
+              <Button 
+                variant="outline" 
+                className="w-full flex items-center justify-center" 
+                onClick={initializeEditForm}
+              >
+                <Edit className="mr-2 h-4 w-4" />
+                Edit User
+              </Button>
+              {showCreditDialog ? (
+                <div className="p-4 border rounded-md bg-card">
+                  <h3 className="font-medium mb-2">Add Credits</h3>
+                  <div className="flex items-center mb-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setCreditAmount(Math.max(0, creditAmount - 10))}
+                    >
+                      -10
+                    </Button>
+                    <input 
+                      type="number" 
+                      value={creditAmount}
+                      onChange={(e) => handleCreditAmountChange(parseInt(e.target.value) || 0)}
+                      className="mx-2 p-2 w-20 text-center border rounded-md"
+                      min="0"
+                    />
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setCreditAmount(creditAmount + 10)}
+                    >
+                      +10
+                    </Button>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button 
+                      onClick={handleAddCredits} 
+                      disabled={isAddingCredits}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {isAddingCredits ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Adding...
+                        </>
+                      ) : (
+                        'Confirm'
+                      )}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowCreditDialog(false)}
+                      disabled={isAddingCredits}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="group relative overflow-hidden rounded-md border bg-background p-1 hover:shadow transition-all duration-200">
+                  <div className="p-2">
+                    <h3 className="font-medium mb-1">Add Credits</h3>
+                    <p className="text-sm text-muted-foreground mb-3">Add credits to this user's account</p>
+                    <Button 
+                      onClick={() => setShowCreditDialog(true)}
+                      disabled={isAddingCredits}
+                      className="bg-green-600 hover:bg-green-700 w-full"
+                    >
+                      {isAddingCredits ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Adding...
+                        </>
+                      ) : (
+                        'Add Credits'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="group relative overflow-hidden rounded-md border bg-background p-1 hover:shadow transition-all duration-200">
+                <div className="p-2">
+                  <h3 className="font-medium mb-1">Toggle Status</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {user?.status === 'active' ? 'Deactivate this user' : 'Activate this user'}
+                  </p>
+                  <Button 
+                    onClick={handleToggleStatus}
+                    disabled={isAddingCredits}
+                    variant={user?.status === 'active' ? 'destructive' : 'default'}
+                    className="w-full"
+                  >
+                    {user?.status === 'active' ? 'Deactivate User' : 'Activate User'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="group relative overflow-hidden rounded-md border bg-background p-1 hover:shadow transition-all duration-200">
+                <div className="p-2">
+                  <h3 className="font-medium mb-1">Delete User</h3>
+                  <p className="text-sm text-muted-foreground mb-3">Permanently delete this user account</p>
+                  <Button 
+                    onClick={handleDeleteUser}
+                    disabled={isAddingCredits}
+                    variant="destructive"
+                    className="w-full"
+                  >
+                    Delete User
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+
+    {/* Credit History Card */}
+    <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950 dark:to-gray-900">
+      <CardHeader>
+        <CardTitle className="text-indigo-900 dark:text-indigo-300 font-bold">Credit History</CardTitle>
+        <CardDescription className="text-indigo-600 dark:text-indigo-400">
+          Transaction history for this user
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoadingCreditHistory ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400" />
+          </div>
+        ) : creditHistory && creditHistory.length > 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Source Domain</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {creditHistory.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      No credit history found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  creditHistory
+                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                    .map((transaction, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{transaction.date || formatTimestamp(transaction.timestamp)}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {transaction.service}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={transaction.action_type === 'credit_addition' ? 'default' : 'destructive'}
+                            className={transaction.action_type === 'credit_addition' ? 'bg-green-500 hover:bg-green-600' : ''}
+                          >
+                            {transaction.action_type === 'credit_addition' ? '+' : '-'}{Math.abs(transaction.amount)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="capitalize">{transaction.status || 'Unknown'}</TableCell>
+                        <TableCell className="text-xs">{transaction.source_domain || 'N/A'}</TableCell>
+                      </TableRow>
+                    ))
+                )}
+              </TableBody>
+            </Table>
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {currentPage} of {Math.ceil(creditHistory.length / itemsPerPage)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => p + 1)}
+                    disabled={currentPage >= Math.ceil(creditHistory.length / itemsPerPage)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              No credit history found for this user
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      {/* Edit User Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update the user's account information and settings.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="status" className="text-right">
+                Status
+              </Label>
+              <div className="col-span-3">
+                <Select 
+                  value={editedUser.status} 
+                  onValueChange={(value) => handleEditFormChange('status', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="suspended">Suspended</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="credits" className="text-right">
+                Credits
+              </Label>
+              <div className="col-span-3">
+                <Input
+                  id="credits"
+                  type="number"
+                  value={editedUser.credits}
+                  onChange={(e) => handleEditFormChange('credits', Number(e.target.value))}
+                  min="0"
+                  step="1"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="plan_type" className="text-right">
+                Plan Type
+              </Label>
+              <div className="col-span-3">
+                <Select 
+                  value={editedUser.plan_type} 
+                  onValueChange={(value) => handleEditFormChange('plan_type', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select plan type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="credit_based">Credit Based</SelectItem>
+                    <SelectItem value="subscription">Subscription</SelectItem>
+                    <SelectItem value="free">Free</SelectItem>
+                    <SelectItem value="enterprise">Enterprise</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="allow_multiple_domains" className="text-right">
+                Multiple Domains
+              </Label>
+              <div className="col-span-3 flex items-center">
+                <Switch 
+                  id="allow_multiple_domains"
+                  checked={editedUser.allow_multiple_domains}
+                  onCheckedChange={(checked) => handleEditFormChange('allow_multiple_domains', checked)}
+                />
+                <span className="ml-2 text-sm text-muted-foreground">
+                  {editedUser.allow_multiple_domains ? 'Allowed' : 'Not Allowed'}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
+            <Button onClick={handleUpdateUser} disabled={isUpdatingUser}>
+              {isUpdatingUser ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

@@ -1,0 +1,969 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { 
+  AlertCircle, 
+  Loader2, 
+  ArrowLeft,
+  ChevronRight,
+  RefreshCw,
+  Users,
+  Copy,
+  Coins,
+  CalendarDays,
+  Clock,
+  Key,
+  AlertTriangle
+} from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { getCurrentUser } from 'aws-amplify/auth';
+import { configureAmplifyClient } from '@/lib/amplifyClient';
+import { Button } from '@/components/ui/button';
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Badge } from "@/components/ui/badge";
+import { format } from 'date-fns';
+
+// API key for accessing the ReIntent API
+const API_KEY = 'ri_5437c19aa7de';
+const API_BASE_URL = 'https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1';
+
+// User type definition
+interface User {
+  user_id: string;
+  email: string;
+  access_key: string;
+  allow_multiple_domains: boolean;
+  created_at: number;
+  updated_at: number;
+  plan_type: string;
+  status: string;
+  credits: number | string;
+  stripe_customer_id?: string;
+}
+
+// Domain usage type definition
+interface DomainUsage {
+  user_id: string;
+  email: string;
+  access_key: string;
+  domains: string[];
+  domain_count: number;
+  status: string;
+  allow_multiple_domains: boolean;
+}
+
+// Credit history transaction type definition
+interface CreditTransaction {
+  transaction_id?: string;
+  timestamp: number;
+  amount: number;
+  type?: 'deduction' | 'addition' | string;
+  description?: string;
+  service?: string;
+  source_domain?: string;
+  action_type?: string;
+  status?: string;
+  date?: string;
+  user_id?: string;
+}
+
+export default function UserProfilePage({ params }: { params: Promise<{ email: string }> | { email: string } }) {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [creditHistory, setCreditHistory] = useState<CreditTransaction[]>([]);
+  const [totalHistoryItems, setTotalHistoryItems] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [domainUsage, setDomainUsage] = useState<DomainUsage | null>(null);
+  const [isLoadingCreditHistory, setIsLoadingCreditHistory] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [creditAmount, setCreditAmount] = useState<number>(10);
+  
+  // Ensure credit amount is always a whole number
+  const handleCreditAmountChange = (value: number) => {
+    setCreditAmount(Math.round(value));
+  };
+  const [showCreditDialog, setShowCreditDialog] = useState(false);
+  
+  // Pagination state for credit history
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Unwrap params and decode the email from URL
+  const resolvedParams = params instanceof Promise ? { email: '' } : params;
+  const decodedEmail = decodeURIComponent(resolvedParams.email);
+
+  // Check authentication and fetch user data
+  useEffect(() => {
+    const checkAuthAndFetchData = async () => {
+      try {
+        // Ensure Amplify is configured
+        configureAmplifyClient();
+        
+        // Check if user is authenticated
+        await getCurrentUser();
+        
+        // Fetch user data
+        await fetchUserData(decodedEmail);
+      } catch (error) {
+        console.error('Not authenticated, redirecting to login', error);
+        router.replace('/login');
+      }
+    };
+
+    checkAuthAndFetchData();
+  }, [decodedEmail, router]);
+  
+  // Fetch credit history when user data is loaded
+  useEffect(() => {
+    if (user) {
+      fetchCreditHistory(user.user_id);
+    }
+  }, [user]);
+
+  // Fetch credit history for a user
+  const fetchCreditHistory = async (userId: string) => {
+    setIsLoadingCreditHistory(true);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/credit-history?key=${API_KEY}`);
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setCreditHistory(data.history || []);
+    } catch (err: any) {
+      console.error('Error fetching credit history:', err);
+      // We don't set the main error state here to avoid disrupting the whole page
+    } finally {
+      setIsLoadingCreditHistory(false);
+    }
+  };
+
+  // Fetch user data from API
+  const fetchUserData = async (email: string) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch all users to get the specific user and domain usage
+      const response = await fetch(`${API_BASE_URL}/admin/users?key=${API_KEY}`);
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Find the specific user by email
+      const foundUser = data.users.find((u: User) => u.email === email);
+      if (!foundUser) {
+        throw new Error(`User with email ${email} not found`);
+      }
+      
+      setUser(foundUser);
+      
+      // Find domain usage for this user
+      const foundDomainUsage = data.domain_usage?.users.find(
+        (du: DomainUsage) => du.email === email
+      );
+      
+      if (foundDomainUsage) {
+        setDomainUsage(foundDomainUsage);
+      }
+      
+    } catch (err: any) {
+      console.error('Error fetching user data:', err);
+      setError(err.message || 'Failed to load user data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Format timestamp to readable date
+  const formatTimestamp = (timestamp: number) => {
+    try {
+      return format(new Date(timestamp * 1000), 'PPP p');
+    } catch (e) {
+      return 'Unknown';
+    }
+  };
+
+  // Format credits value
+  const formatCredits = (credits: number | string | undefined) => {
+    if (credits === undefined || credits === null) return '0';
+    
+    try {
+      if (typeof credits === 'number') {
+        return credits.toFixed(1);
+      }
+      if (typeof credits === 'string') {
+        const num = parseFloat(credits);
+        return isNaN(num) ? credits : num.toFixed(1);
+      }
+      return String(credits);
+    } catch (e) {
+      return '0';
+    }
+  };
+
+  // Handle back button click
+  const handleBackClick = () => {
+    router.back();
+  };
+
+  // Handle user status toggle (activate/deactivate)
+  const handleToggleStatus = async () => {
+    if (!user) return;
+    
+    const newStatus = user.status === 'active' ? 'inactive' : 'active';
+    setActionLoading(newStatus === 'active' ? 'activate' : 'deactivate');
+    
+    try {
+      // Format credits value to ensure it's a whole number
+      const creditsValue = typeof user.credits === 'number' 
+        ? Math.round(user.credits) 
+        : Math.round(Number(user.credits || 0));
+      
+      // Use our server-side proxy to avoid CORS issues
+      const proxyResponse = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          endpoint: '/users',
+          method: 'PUT',
+          headers: {
+            'x-api-key': user.access_key
+          },
+          data: {
+            status: newStatus,
+            credits: creditsValue,
+            plan_type: user.plan_type || 'credit_based'
+          }
+        })
+      });
+      
+      const proxyData = await proxyResponse.json();
+      
+      if (!proxyResponse.ok || (proxyData.status && proxyData.status >= 400)) {
+        throw new Error(proxyData.error || `API request failed with status ${proxyData.status}`);
+      }
+      
+      // Set the response to the data from the proxy
+      const response = {
+        ok: proxyData.status < 400,
+        status: proxyData.status,
+        json: async () => proxyData.data
+      };
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      // Update the user state with the new status
+      setUser(prev => prev ? {...prev, status: newStatus} : null);
+      
+    } catch (err: any) {
+      console.error('Error updating user status:', err);
+      setError(`Failed to update user status: ${err.message}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+  
+  // Handle adding credits to user
+  const handleAddCredits = async () => {
+    if (!user) return;
+    
+    setActionLoading('credits');
+    
+    try {
+      // Calculate the new total credits as a whole number
+      const newTotalCredits = Math.round(
+        typeof user.credits === 'number' 
+          ? user.credits + creditAmount 
+          : Number(user.credits || 0) + creditAmount
+      );
+      
+      // Prepare request data for logging
+      const url = `${API_BASE_URL}/users`;
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-api-key': user.access_key
+      };
+      const requestBody = {
+        status: user.status || 'active',
+        credits: newTotalCredits,
+        plan_type: user.plan_type || 'credit_based'
+      };
+      
+      console.log('Making API request to:', url);
+      console.log('With headers:', headers);
+      console.log('With body:', requestBody);
+      
+      // Use our server-side proxy to avoid CORS issues
+      console.log('Using server-side proxy to make API call');
+      
+      const proxyResponse = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          endpoint: '/users',
+          method: 'PUT',
+          headers: {
+            'x-api-key': user.access_key
+          },
+          data: {
+            status: user.status || 'active',
+            credits: newTotalCredits,
+            plan_type: user.plan_type || 'credit_based'
+          }
+        })
+      });
+      
+      const proxyData = await proxyResponse.json();
+      console.log('Proxy response:', proxyData);
+      
+      if (!proxyResponse.ok || (proxyData.status && proxyData.status >= 400)) {
+        throw new Error(proxyData.error || `API request failed with status ${proxyData.status}`);
+      }
+      
+      // Set the response to the data from the proxy
+      const response = {
+        ok: proxyData.status < 400,
+        status: proxyData.status,
+        json: async () => proxyData.data
+      };
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      // Update the user state with the new credits
+      setUser(prev => {
+        if (!prev) return null;
+        const updatedCredits = typeof prev.credits === 'number' 
+          ? prev.credits + creditAmount 
+          : Number(prev.credits || 0) + creditAmount;
+        return {...prev, credits: updatedCredits};
+      });
+      
+      // Refresh credit history
+      if (user) {
+        fetchCreditHistory(user.user_id);
+      }
+      
+      setShowCreditDialog(false);
+      
+    } catch (err: any) {
+      console.error('Error adding credits:', err);
+      
+      // Provide more detailed error information
+      let errorMessage = 'Failed to add credits';
+      
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        errorMessage = `Network Error: ${err.message}\n\nThis might be due to CORS restrictions, network connectivity issues, or an invalid API endpoint.`;
+      } else if (err instanceof SyntaxError && err.message.includes('JSON')) {
+        errorMessage = `JSON Parsing Error: ${err.message}\n\nThe server response couldn't be parsed as JSON.`;
+      } else if (err.message) {
+        errorMessage = `API Error: ${err.message}`;
+      }
+      
+      // Add request details to the error message
+      errorMessage += '\n\nRequest Details:\n';
+      errorMessage += `URL: ${API_BASE_URL}/users\n`;
+      errorMessage += `Method: PUT\n`;
+      errorMessage += `Headers: Content-Type: application/json, x-api-key: ${user.access_key.substring(0, 5)}...\n`;
+      errorMessage += `Body: status=${user.status || 'active'}, credits=${Math.round(Number(user.credits || 0) + creditAmount)}, plan_type=${user.plan_type || 'credit_based'}`;
+      
+      console.error('Full error details:', err);
+      setError(errorMessage);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+  
+  // Handle delete user
+  const handleDeleteUser = async () => {
+    if (!user || !window.confirm(`Are you sure you want to delete user ${user.email}? This action cannot be undone.`)) {
+      return;
+    }
+    
+    setActionLoading('delete');
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/users/${user.user_id}/delete?key=${API_KEY}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      // Redirect back to dashboard after successful deletion
+      router.replace('/dashboard');
+      
+    } catch (err: any) {
+      console.error('Error deleting user:', err);
+      setError(`Failed to delete user: ${err.message}`);
+      setActionLoading(null);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-4 space-y-6">
+        <Breadcrumb className="mb-6">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/dashboard">Users</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Loading...</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
+        <div className="h-8 w-1/3 mb-2 bg-muted animate-pulse rounded-md"></div>
+        <div className="h-4 w-1/4 bg-muted animate-pulse rounded-md"></div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <div className="h-6 w-1/3 bg-muted animate-pulse rounded-md mb-2"></div>
+              <div className="h-4 w-1/4 bg-muted animate-pulse rounded-md"></div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {Array(6).fill(0).map((_, i) => (
+                <div key={i} className="flex justify-between items-center border-b pb-2">
+                  <div className="h-4 w-1/4 bg-muted animate-pulse rounded-md"></div>
+                  <div className="h-4 w-1/2 bg-muted animate-pulse rounded-md"></div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <div className="h-6 w-1/3 bg-muted animate-pulse rounded-md mb-2"></div>
+              <div className="h-4 w-1/4 bg-muted animate-pulse rounded-md"></div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {Array(3).fill(0).map((_, i) => (
+                <div key={i} className="flex justify-between items-center border-b pb-2">
+                  <div className="h-4 w-1/4 bg-muted animate-pulse rounded-md"></div>
+                  <div className="h-4 w-1/2 bg-muted animate-pulse rounded-md"></div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !user) {
+    return (
+      <div className="container mx-auto p-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-destructive">{error || 'User not found'}</p>
+          </CardContent>
+          <CardFooter>
+            <Button onClick={handleBackClick}>Back to Users</Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  // Main return for the user profile page
+  return (
+    <div className="container mx-auto p-4 space-y-6">
+      <Breadcrumb className="mb-6">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/dashboard/users">Users</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{user?.email}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="md:col-span-3">
+          <CardContent className="p-0">
+              <div className="flex flex-col md:flex-row">
+                {/* User avatar and basic info */}
+                <div className="p-6 md:p-8 flex flex-col md:border-r border-border md:w-1/3 bg-card">
+                  <div className="flex flex-col items-center md:items-start gap-4 mb-6">
+                    <div className="relative">
+                      <div className="h-24 w-24 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white text-3xl font-bold">
+                        {user.email.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-background flex items-center justify-center border-2 border-background">
+                        <Badge variant={user.status === 'active' ? 'default' : 'secondary'} className="h-4 w-4 rounded-full p-0">
+                          &nbsp;
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="text-center md:text-left">
+                      <h2 className="text-xl font-bold">{user.email.split('@')[0]}</h2>
+                      <p className="text-muted-foreground text-sm">{user.email}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-muted-foreground">Status</Label>
+                      <Badge variant={user.status === 'active' ? 'default' : 'secondary'} className="capitalize">
+                        {user.status}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <Label className="text-muted-foreground">Credits</Label>
+                      <div className="flex items-center gap-2">
+                        <Coins className="h-4 w-4 text-amber-500" />
+                        <span className="font-bold">{user.credits}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <Label className="text-muted-foreground">Plan Type</Label>
+                      <Badge variant="outline" className="capitalize font-normal">
+                        {user.plan_type || 'credit_based'}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <Label className="text-muted-foreground">Created</Label>
+                      <div className="flex items-center gap-2">
+                        <CalendarDays className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-sm">{new Date(user.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="pt-2">
+                      <Label className="text-muted-foreground text-xs mb-1 block">User ID</Label>
+                      <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-md">
+                        <p className="text-xs font-mono text-muted-foreground truncate">{user.user_id}</p>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={() => navigator.clipboard.writeText(user.user_id)}>
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {loading ? (
+                  <div className="flex justify-center items-center h-64">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="relative">
+                        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-background flex items-center justify-center border-2 border-background">
+                          <div className="h-4 w-4 rounded-full bg-muted animate-pulse"></div>
+                        </div>
+                      </div>
+                      <p className="text-muted-foreground">Loading user profile...</p>
+                    </div>
+                  </div>
+                ) : error ? (
+                  <div className="bg-destructive/10 text-destructive p-6 rounded-lg border border-destructive/20 shadow-sm">
+                    <div className="flex items-center gap-3 mb-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      <h3 className="font-semibold">Error Loading Profile</h3>
+                    </div>
+                    <p>{error}</p>
+                  </div>
+                ) : user ? (
+                  <div className="flex flex-col md:flex-row">
+                    {/* User avatar and basic info */}
+                    <div className="p-6 md:p-8 flex flex-col md:border-r border-border md:w-1/3 bg-card">
+                      <div className="flex flex-col items-center md:items-start gap-4 mb-6">
+                        <div className="relative">
+                          <div className="h-24 w-24 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white text-3xl font-bold">
+                            {user.email.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-background flex items-center justify-center border-2 border-background">
+                            <Badge variant={user.status === 'active' ? 'default' : 'secondary'} className="h-4 w-4 rounded-full p-0">
+                              &nbsp;
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="text-center md:text-left">
+                          <h2 className="text-xl font-bold">{user.email.split('@')[0]}</h2>
+                          <p className="text-muted-foreground text-sm">{user.email}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <Label className="text-muted-foreground">Status</Label>
+                          <Badge variant={user.status === 'active' ? 'default' : 'secondary'} className="capitalize">
+                            {user.status}
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <Label className="text-muted-foreground">Credits</Label>
+                          <div className="flex items-center gap-2">
+                            <Coins className="h-4 w-4 text-amber-500" />
+                            <span className="font-bold">{user.credits}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <Label className="text-muted-foreground">Plan Type</Label>
+                          <Badge variant="outline" className="capitalize font-normal">
+                            {user.plan_type || 'credit_based'}
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <Label className="text-muted-foreground">Created</Label>
+                          <div className="flex items-center gap-2">
+                            <CalendarDays className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-sm">{new Date(user.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="pt-2">
+                          <Label className="text-muted-foreground text-xs mb-1 block">User ID</Label>
+                          <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-md">
+                            <p className="text-xs font-mono text-muted-foreground truncate">{user.user_id}</p>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={() => navigator.clipboard.writeText(user.user_id)}>
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex justify-between items-center border-b pb-2">
+                        <span className="font-medium">Stripe Customer ID:</span>
+                        <span className="font-mono text-xs">{user.stripe_customer_id}</span>
+                      </div>
+                      <div className="flex justify-between items-center border-b pb-2">
+                        <span className="font-medium">Created:</span>
+                        <span>{formatTimestamp(user.created_at)}</span>
+                      </div>
+                      <div className="flex justify-between items-center border-b pb-2">
+                        <span className="font-medium">Last Updated:</span>
+                        <span>{formatTimestamp(user.updated_at)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-center items-center h-64">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="relative">
+                        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-background flex items-center justify-center border-2 border-background">
+                          <div className="h-4 w-4 rounded-full bg-muted animate-pulse"></div>
+                        </div>
+                      </div>
+                      <p className="text-muted-foreground">Loading user profile...</p>
+                    </div>
+                  </div>
+                )}
+                    </ul>
+                  ) : (
+                    <p className="text-muted-foreground italic">No domains registered</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-muted-foreground italic">No domain usage information available</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Action Buttons */}
+      <Card>
+        <CardHeader>
+          <CardTitle>User Actions</CardTitle>
+          <CardDescription>Manage this user account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <div className="bg-destructive/10 text-destructive p-4 rounded-md mb-4">
+              <pre className="whitespace-pre-wrap text-xs font-mono overflow-auto max-h-60">
+                {error}
+              </pre>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="mt-2" 
+                onClick={() => setError(null)}
+              >
+                Dismiss
+              </Button>
+            </div>
+          )}
+          
+          <div className="flex flex-wrap gap-4">
+            {showCreditDialog ? (
+              <div className="flex items-center gap-2 w-full">
+                <input
+                  type="number"
+                  value={creditAmount}
+                  onChange={(e) => handleCreditAmountChange(Number(e.target.value))}
+                  className="flex h-10 w-24 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  min="1"
+                  max="1000"
+                  step="1"
+                />
+                <Button 
+                  onClick={handleAddCredits} 
+                  disabled={actionLoading === 'credits'}
+                  size="sm"
+                  className="gap-1"
+                >
+                  {actionLoading === 'credits' ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <Coins className="h-3 w-3" />
+                      Confirm
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowCreditDialog(false)}
+                  disabled={actionLoading === 'credits'}
+                  size="sm"
+                  className="gap-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="group relative overflow-hidden rounded-md border bg-background p-1 hover:shadow transition-all duration-200">
+                  <div className="p-2">
+                    <h3 className="font-medium mb-1">Add Credits</h3>
+                    <p className="text-xs text-muted-foreground">Increase user's credit balance</p>
+                  </div>
+                  <div className="mt-2 flex justify-end border-t pt-2 pr-2">
+                    <Button 
+                      onClick={() => setShowCreditDialog(true)} 
+                      disabled={actionLoading === 'credits'}
+                      size="sm"
+                      className="gap-1"
+                    >
+                      {actionLoading === 'credits' ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <Coins className="h-3 w-3" />
+                          Add Credits
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-primary/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </div>
+                
+                <div className="group relative overflow-hidden rounded-md border bg-background p-1 hover:shadow transition-all duration-200">
+                  <div className="p-2">
+                    <h3 className="font-medium mb-1">User Status</h3>
+                    <p className="text-xs text-muted-foreground">Change account activation status</p>
+                  </div>
+                  <div className="mt-2 flex justify-end border-t pt-2 pr-2">
+                    <Button 
+                      onClick={handleToggleStatus} 
+                      disabled={actionLoading === 'activate' || actionLoading === 'deactivate'}
+                      variant={user.status === 'active' ? 'destructive' : 'default'}
+                      size="sm"
+                      className="gap-1"
+                    >
+                      {actionLoading === 'activate' || actionLoading === 'deactivate' ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          {user.status === 'active' ? 'Deactivating...' : 'Activating...'}
+                        </>
+                      ) : (
+                        <>
+                          {user.status === 'active' ? (
+                            <>
+                              <AlertCircle className="h-3 w-3" />
+                              Deactivate
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="h-3 w-3" />
+                              Activate
+                            </>
+                          )}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-primary/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </div>
+                
+                <div className="group relative overflow-hidden rounded-md border bg-background p-1 hover:shadow transition-all duration-200">
+                  <div className="p-2">
+                    <h3 className="font-medium mb-1">Delete Account</h3>
+                    <p className="text-xs text-muted-foreground">Permanently remove this user</p>
+                  </div>
+                  <div className="mt-2 flex justify-end border-t pt-2 pr-2">
+                    <Button 
+                      onClick={handleDeleteUser} 
+                      disabled={actionLoading === 'delete'}
+                      variant="destructive"
+                      size="sm"
+                      className="gap-1"
+                    >
+                      {actionLoading === 'delete' ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-3 w-3" />
+                          Delete User
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-destructive/5 to-destructive/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </div>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Credit History Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Credit History</CardTitle>
+          <CardDescription>Record of credit transactions for this user</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingCreditHistory ? (
+            <div className="py-4 text-center">
+              <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+              <p className="mt-2 text-sm text-muted-foreground">Loading credit history...</p>
+            </div>
+          ) : creditHistory.length > 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="py-2 px-3 text-left text-sm font-medium">Date</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Amount</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Service</th>
+                      <th className="py-2 px-3 text-left text-sm font-medium">Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {creditHistory
+                      .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                      .map((transaction, index) => (
+                        <tr key={transaction.transaction_id || `transaction-${index}`} className="border-b hover:bg-muted/50">
+                          <td className="py-2 px-3 text-sm">{formatTimestamp(transaction.timestamp)}</td>
+                          <td className="py-2 px-3 text-sm font-medium">
+                            <span className={(transaction.type === 'deduction' || transaction.action_type === 'credit_reserve') ? 'text-destructive' : 'text-green-600'}>
+                              {(transaction.type === 'deduction' || transaction.action_type === 'credit_reserve') ? '-' : '+'}{transaction.amount.toFixed(1)}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-sm font-mono text-xs">{transaction.service || 'N/A'}</td>
+                          <td className="py-2 px-3 text-sm font-mono text-xs truncate max-w-[150px]" title={transaction.source_domain}>
+                            {transaction.source_domain || 'N/A'}
+                          </td>
+                        </tr>
+                      ))
+                    }
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Pagination Controls */}
+              {creditHistory.length > itemsPerPage && (
+                <div className="flex items-center justify-center space-x-2 mt-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  
+                  <div className="text-sm">
+                    Page {currentPage} of {Math.ceil(creditHistory.length / itemsPerPage)}
+                  </div>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setCurrentPage(p => Math.min(Math.ceil(creditHistory.length / itemsPerPage), p + 1))}
+                    disabled={currentPage >= Math.ceil(creditHistory.length / itemsPerPage)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-muted-foreground italic py-4 text-center">No credit history available</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
