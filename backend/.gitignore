@@ -1,0 +1,4 @@
+node_modules
+.serverless
+.env.*
+!.env.example # Optional: commit an example env file

@@ -1,0 +1,76 @@
+service: omnipanel-backend
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x # Or nodejs20.x if preferred
+  stage: ${opt:stage, 'staging'} # Default to staging, override with --stage production
+  region: us-east-1 # Choose your preferred region
+
+plugins:
+  - serverless-offline
+  - serverless-dotenv-plugin
+
+custom:
+  dotenv:
+    path: .env.${self:provider.stage} # Load .env.staging or .env.production
+  serverless-offline:
+    httpPort: 3001 # Port for local testing
+
+functions:
+  api:
+    handler: handler.handler
+    environment:
+      COGNITO_USER_POOL_ID: { Ref: CognitoUserPool }
+      COGNITO_APP_CLIENT_ID: { Ref: CognitoUserPoolClient }
+      DYNAMODB_TABLE_PREFIX: "OmniPanel-${self:provider.stage}-" # Example prefix
+      STAGE: ${self:provider.stage}
+    events:
+      - httpApi: '*' # Catch-all for API Gateway HTTP API
+
+resources:
+  Resources:
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: OmniPanelAdmins-${self:provider.stage}
+        Schema:
+          - Name: email
+            AttributeDataType: String
+            Mutable: false
+            Required: true
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireSymbols: false # Set to true if symbols are desired
+            RequireUppercase: true
+        AliasAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+        # MfaConfiguration: OFF # Optional: Configure MFA (e.g., ON, OPTIONAL)
+        # AdminCreateUserConfig: # Optional: Allow admins to create users without verification email
+        #   AllowAdminCreateUserOnly: true
+
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: OmniPanelFrontend-${self:provider.stage}
+        UserPoolId: { Ref: CognitoUserPool }
+        ExplicitAuthFlows:
+          - ALLOW_USER_SRP_AUTH # Secure Remote Password protocol
+          - ALLOW_REFRESH_TOKEN_AUTH
+        GenerateSecret: false # No secret needed for public client (like a browser app)
+        PreventUserExistenceErrors: ENABLED # Recommended for security
+        SupportedIdentityProviders:
+          - COGNITO
+
+  Outputs:
+    CognitoUserPoolId:
+      Description: "ID of the Cognito User Pool for Admins"
+      Value: { Ref: CognitoUserPool }
+    CognitoUserPoolClientId:
+      Description: "ID of the Cognito User Pool Client for the Frontend"
+      Value: { Ref: CognitoUserPoolClient }
