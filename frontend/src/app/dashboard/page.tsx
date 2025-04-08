@@ -10,6 +10,7 @@ import { UsersTable, User } from '@/components/users/UsersTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Search, X, UserPlus, Loader2, BarChart3 } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { AnalyticsTab } from '@/components/analytics/AnalyticsTab';
 import {
   Dialog,
@@ -241,6 +242,7 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-indigo-400 dark:to-violet-400">OmniDashboard</h1>
         <div className="flex items-center gap-4">
           <p className="text-sm text-slate-600 dark:text-slate-400">Signed in as: <span className="font-medium text-indigo-600 dark:text-indigo-400">{username}</span></p>
+          <ThemeToggle />
           <Button onClick={handleSignOut} variant="outline" size="sm" className="border-indigo-200 hover:bg-indigo-50 dark:border-indigo-800 dark:hover:bg-indigo-950/50">
             Sign Out
           </Button>

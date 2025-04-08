@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils"; // Import cn utility
 import AuthProvider from "@/components/auth/AuthProvider"; // Import the new provider
 import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,8 +35,10 @@ export default function RootLayout({
           geistMono.variable
         )}
       >
-        <AuthProvider>{children}</AuthProvider>
-        <Toaster />
+        <ThemeProvider defaultTheme="system" storageKey="omnidashboard-theme">
+          <AuthProvider>{children}</AuthProvider>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -712,7 +712,7 @@ export default function UserProfilePage({ params }: { params: { email: string } 
                 {/* Domain Usage */}
                 <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">Domain Usage</h2>
+              <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">Domain Usage</h2>
               <p className="text-blue-600 dark:text-blue-400">Domains used by this user</p>
             </div>
 
@@ -741,22 +741,22 @@ export default function UserProfilePage({ params }: { params: { email: string } 
                 {/* User Actions */}
                 <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-bold">User Actions</h2>
-              <p className="text-muted-foreground">Manage this user account</p>
+              <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-rose-600 to-orange-600 dark:from-rose-400 dark:to-orange-400">User Actions</h2>
+              <p className="text-rose-600 dark:text-rose-400">Manage this user account</p>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
               <Button 
                 variant="outline" 
-                className="w-full flex items-center justify-center" 
+                className="w-full flex items-center justify-center bg-gradient-to-r from-indigo-50 to-white dark:from-indigo-950 dark:to-gray-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:shadow-md transition-all duration-200" 
                 onClick={initializeEditForm}
               >
-                <Edit className="mr-2 h-4 w-4" />
+                <Edit className="mr-2 h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                 Edit User
               </Button>
               {showCreditDialog ? (
-                <div className="p-4 border rounded-md bg-card">
-                  <h3 className="font-medium mb-2">Add Credits</h3>
+                <div className="p-4 border rounded-md bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950 dark:to-gray-900 border-emerald-200 dark:border-emerald-800 shadow-md">
+                  <h3 className="font-medium mb-2 text-emerald-700 dark:text-emerald-400">Add Credits</h3>
                   <div className="flex items-center mb-4">
                     <Button 
                       variant="outline" 
@@ -769,7 +769,7 @@ export default function UserProfilePage({ params }: { params: { email: string } 
                       type="number" 
                       value={creditAmount}
                       onChange={(e) => handleCreditAmountChange(parseInt(e.target.value) || 0)}
-                      className="mx-2 p-2 w-20 text-center border rounded-md"
+                      className="mx-2 p-2 w-20 text-center border rounded-md border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       min="0"
                     />
                     <Button 
@@ -784,7 +784,7 @@ export default function UserProfilePage({ params }: { params: { email: string } 
                     <Button 
                       onClick={handleAddCredits} 
                       disabled={isAddingCredits}
-                      className="bg-green-600 hover:bg-green-700"
+                      className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 dark:from-emerald-600 dark:to-green-600 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200"
                     >
                       {isAddingCredits ? (
                         <>
@@ -805,14 +805,14 @@ export default function UserProfilePage({ params }: { params: { email: string } 
                   </div>
                 </div>
               ) : (
-                <div className="group relative overflow-hidden rounded-md border bg-background p-1 hover:shadow transition-all duration-200">
+                <div className="group relative overflow-hidden rounded-md border border-emerald-200 dark:border-emerald-800 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950 dark:to-gray-900 p-1 hover:shadow-md transition-all duration-200">
                   <div className="p-2">
-                    <h3 className="font-medium mb-1">Add Credits</h3>
-                    <p className="text-sm text-muted-foreground mb-3">Add credits to this user's account</p>
+                    <h3 className="font-medium mb-1 text-emerald-700 dark:text-emerald-400">Add Credits</h3>
+                    <p className="text-sm text-emerald-600 dark:text-emerald-500 mb-3">Add credits to this user's account</p>
                     <Button 
                       onClick={() => setShowCreditDialog(true)}
                       disabled={isAddingCredits}
-                      className="bg-green-600 hover:bg-green-700 w-full"
+                      className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 dark:from-emerald-600 dark:to-green-600 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200 w-full"
                     >
                       {isAddingCredits ? (
                         <>
@@ -827,10 +827,10 @@ export default function UserProfilePage({ params }: { params: { email: string } 
                 </div>
               )}
 
-              <div className="group relative overflow-hidden rounded-md border bg-background p-1 hover:shadow transition-all duration-200">
+              <div className="group relative overflow-hidden rounded-md border border-amber-200 dark:border-amber-800 bg-gradient-to-br from-amber-50 to-white dark:from-amber-950 dark:to-gray-900 p-1 hover:shadow-md transition-all duration-200">
                 <div className="p-2">
-                  <h3 className="font-medium mb-1">Toggle Status</h3>
-                  <p className="text-sm text-muted-foreground mb-3">
+                  <h3 className="font-medium mb-1 text-amber-700 dark:text-amber-400">Toggle Status</h3>
+                  <p className="text-sm text-amber-600 dark:text-amber-500 mb-3">
                     {user?.status === 'active' ? 'Deactivate this user' : 'Activate this user'}
                   </p>
                   <Button 
@@ -844,15 +844,15 @@ export default function UserProfilePage({ params }: { params: { email: string } 
                 </div>
               </div>
 
-              <div className="group relative overflow-hidden rounded-md border bg-background p-1 hover:shadow transition-all duration-200">
+              <div className="group relative overflow-hidden rounded-md border border-rose-200 dark:border-rose-800 bg-gradient-to-br from-rose-50 to-white dark:from-rose-950 dark:to-gray-900 p-1 hover:shadow-md transition-all duration-200">
                 <div className="p-2">
-                  <h3 className="font-medium mb-1">Delete User</h3>
-                  <p className="text-sm text-muted-foreground mb-3">Permanently delete this user account</p>
+                  <h3 className="font-medium mb-1 text-rose-700 dark:text-rose-400">Delete User</h3>
+                  <p className="text-sm text-rose-600 dark:text-rose-500 mb-3">Permanently delete this user account</p>
                   <Button 
                     onClick={handleDeleteUser}
                     disabled={isAddingCredits}
                     variant="destructive"
-                    className="w-full"
+                    className="w-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 border-0 shadow-md hover:shadow-lg transition-all duration-200"
                   >
                     Delete User
                   </Button>
@@ -863,11 +863,10 @@ export default function UserProfilePage({ params }: { params: { email: string } 
               </div>
             </CardContent>
           </Card>
-
           {/* Credit History Card */}
           <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950 dark:to-gray-900">
             <CardHeader>
-              <CardTitle className="text-indigo-900 dark:text-indigo-300 font-bold">Credit History</CardTitle>
+              <CardTitle className="text-indigo-900 dark:text-indigo-300 text-2xl font-bold">Credit History</CardTitle>
               <CardDescription className="text-indigo-600 dark:text-indigo-400">
                 Transaction history for this user
               </CardDescription>
