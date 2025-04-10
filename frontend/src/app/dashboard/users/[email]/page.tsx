@@ -400,62 +400,91 @@ export default function UserProfilePage({ params }: { params: Promise<{ email: s
     }
   };
 
-  // Fetch user notes from API
+  // Fetch user notes from localStorage
   const fetchUserNotes = async (userId: string) => {
     try {
       setIsLoadingNotes(true);
       console.log('Fetching notes for user ID:', userId);
       
-      // Make a direct API call to the documented endpoint
-      const directApiUrl = `${API_BASE_URL}/admin/chart-notes?key=${API_KEY}&user_id=${userId}`;
-      console.log('Making direct API call to fetch notes:', directApiUrl);
+      // Determine the storage key based on userId
+      const storageKey = `chartNotes_user_${userId}`;
+      console.log('Using storage key:', storageKey);
       
-      const response = await fetch(directApiUrl);
+      // Load saved notes from localStorage with error handling
+      let savedNotes;
+      let notes = [];
       
-      if (!response.ok) {
-        console.error('API response not OK:', response.status, response.statusText);
-        throw new Error(`Failed to fetch user notes: ${response.status}`);
+      try {
+        savedNotes = localStorage.getItem(storageKey);
+        notes = savedNotes ? JSON.parse(savedNotes) : [];
+        console.log('Loaded notes from localStorage:', notes);
+      } catch (parseError) {
+        console.error('Error parsing saved notes from localStorage:', parseError);
+        notes = [];
+        // Try to clean up corrupted data
+        localStorage.removeItem(storageKey);
       }
       
-      const data = await response.json();
-      console.log('User notes raw response:', data);
-      
-      // Check if notes are in the expected format as per the API documentation
-      if (Array.isArray(data.notes)) {
-        console.log('Found notes in the expected format:', data.notes);
+      // If no notes exist and this is a development environment, create test notes
+      if (notes.length === 0 && window.location.hostname.includes('localhost')) {
+        console.log('No notes found, creating test notes for debugging');
         
-        // Process notes to add formatted dates
-        const processedNotes = data.notes.map((note: any) => {
-          // Convert created_at timestamp to formatted date if it exists
-          let formattedDate = '';
-          if (note.created_at) {
-            const date = new Date(note.created_at * 1000);
-            formattedDate = date.toLocaleDateString('en-US', { 
-              year: 'numeric', 
-              month: 'short', 
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            });
-          }
-          
-          return {
-            ...note,
-            formatted_date: formattedDate || note.date
-          };
-        });
+        // Create a note for today
+        const today = new Date();
+        const testNote1 = {
+          id: 'test_note_1_' + Date.now(),
+          date: today.toISOString().split('T')[0],
+          content: `Test note for user ${userId} today - Admin`,
+          created_at: today.toISOString(),
+          user_id: userId
+        };
         
-        // Sort notes by created_at timestamp in descending order (newest first)
-        processedNotes.sort((a: any, b: any) => {
-          return (b.created_at || 0) - (a.created_at || 0);
-        });
+        // Create a note for a past date
+        const pastDate = new Date();
+        pastDate.setDate(pastDate.getDate() - 5);
+        const testNote2 = {
+          id: 'test_note_2_' + Date.now(),
+          date: pastDate.toISOString().split('T')[0],
+          content: `Previous activity noted for ${userId} - Admin`,
+          created_at: pastDate.toISOString(),
+          user_id: userId
+        };
         
-        console.log('Processed and sorted notes:', processedNotes);
-        setUserNotes(processedNotes);
-      } else {
-        console.warn('No notes found or invalid format:', data);
-        setUserNotes([]);
+        notes.push(testNote1, testNote2);
+        localStorage.setItem(storageKey, JSON.stringify(notes));
+        console.log('Created test notes:', notes);
       }
+      
+      // Process notes to add formatted dates
+      const processedNotes = notes.map((note: any) => {
+        // Convert created_at timestamp to formatted date if it exists
+        let formattedDate = '';
+        if (note.created_at) {
+          const date = new Date(note.created_at);
+          formattedDate = date.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        }
+        
+        return {
+          ...note,
+          formatted_date: formattedDate || note.date
+        };
+      });
+      
+      // Sort notes by created_at timestamp in descending order (newest first)
+      processedNotes.sort((a: any, b: any) => {
+        const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+        const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      console.log('Processed and sorted notes:', processedNotes);
+      setUserNotes(processedNotes);
     } catch (err: any) {
       console.error('Error fetching user notes:', err);
       setUserNotes([]);
@@ -504,37 +533,61 @@ export default function UserProfilePage({ params }: { params: Promise<{ email: s
     }
   };
 
-  // Handle adding credits to user
+  // Handle adding credits to user using webhook approach
   const handleAddCredits = async () => {
     if (!user || !creditAmount) return;
     
     try {
       setIsAddingCredits(true);
+      console.log('Adding credits via webhook:', creditAmount);
       
-      const response = await fetch('/api/proxy', {
+      // Use the webhook endpoint to handle both updating the user and recording the transaction
+      const webhookResponse = await fetch('/api/webhook', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          endpoint: `${API_BASE_URL}/admin/users/${user.user_id}`,
-          method: 'PUT',
-          apiKey: API_KEY,
+          action: 'add_credits',
+          userId: user.user_id,
           data: {
-            credits: user.credits + creditAmount
+            amount: creditAmount,
+            currentCredits: user.credits,
+            apiKey: user.access_key, // Pass the user's API key
+            service: 'admin',
+            sourceDomain: 'admin.dashboard',
+            description: 'Credits added by admin'
           }
         }),
       });
       
-      if (!response.ok) {
-        console.error('API response not OK:', response.status, response.statusText);
-        throw new Error(`Failed to add credits: ${response.status}`);
+      const webhookResult = await webhookResponse.json();
+      console.log('Webhook response:', webhookResult);
+      
+      if (!webhookResponse.ok) {
+        console.error('Webhook response not OK:', webhookResponse.status, webhookResponse.statusText);
+        console.error('Webhook error details:', webhookResult);
+        throw new Error(`Failed to add credits: ${webhookResult.error || webhookResponse.status}`);
       }
       
-      // Update user state with new credits
-      setUser({
-        ...user,
-        credits: user.credits + creditAmount
+      // Update user state with new credits from the webhook response
+      if (webhookResult.updatedCredits) {
+        setUser({
+          ...user,
+          credits: webhookResult.updatedCredits
+        });
+      } else {
+        // Fallback if webhook doesn't return updated credits
+        setUser({
+          ...user,
+          credits: user.credits + creditAmount
+        });
+      }
+      
+      // Show success message
+      toast({
+        title: "Credits Added",
+        description: `${creditAmount} credits have been added to the user's account`
       });
       
       // Close dialog and reset credit amount
@@ -544,9 +597,16 @@ export default function UserProfilePage({ params }: { params: Promise<{ email: s
       // Refresh credit history
       await fetchCreditHistory(user.user_id);
       
+      // Refresh user data to ensure we have the latest information
+      await fetchUserData(user.email, true);
+      
     } catch (err: any) {
       console.error('Error adding credits:', err);
       setError(`Failed to add credits: ${err.message}`);
+      toast({
+        title: "Error",
+        description: `Failed to add credits: ${err.message}`
+      });
     } finally {
       setIsAddingCredits(false);
     }
@@ -567,44 +627,33 @@ export default function UserProfilePage({ params }: { params: Promise<{ email: s
       
       console.log(`Adding new note for user ${user.email}: ${noteWithSignature}`);
       
-      // Create the note payload according to the API documentation
-      const noteData = {
+      // Determine the storage key based on userId
+      const storageKey = `chartNotes_user_${user.user_id}`;
+      console.log('Using storage key for saving note:', storageKey);
+      
+      // Load existing notes from localStorage
+      const savedNotes = localStorage.getItem(storageKey);
+      let existingNotes = savedNotes ? JSON.parse(savedNotes) : [];
+      
+      // Create a new note object
+      const newNoteData = {
+        id: `note_${Date.now()}`,
         title: `Note for ${user.email}`,
         content: noteWithSignature,
         date: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
         context: 'user',
-        user_id: user.user_id
+        user_id: user.user_id,
+        created_at: new Date().toISOString()
       };
       
-      console.log('Sending note data to API:', noteData);
+      console.log('Created new note:', newNoteData);
       
-      // Make a direct API call to create the note
-      const directApiUrl = `${API_BASE_URL}/admin/chart-notes?key=${API_KEY}`;
-      console.log('Making direct API call to create note:', directApiUrl);
+      // Add the new note to the existing notes
+      existingNotes.push(newNoteData);
       
-      const response = await fetch(directApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(noteData)
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to add note:', response.status, errorText);
-        throw new Error(`Failed to add note: ${response.status}`);
-      }
-      
-      const responseData = await response.json();
-      console.log('Note creation response:', responseData);
-      
-      // Create a note object with the response data or fallback to our data
-      const newNoteData = responseData.note || {
-        id: `note_${Date.now()}`,
-        ...noteData,
-        created_at: Math.floor(Date.now() / 1000)
-      };
+      // Save the updated notes to localStorage
+      localStorage.setItem(storageKey, JSON.stringify(existingNotes));
+      console.log('Saved notes to localStorage:', existingNotes);
       
       // Format the date for display
       const formattedNote = {
@@ -623,36 +672,64 @@ export default function UserProfilePage({ params }: { params: Promise<{ email: s
       // Add the new note to the state
       setUserNotes(prev => [formattedNote, ...prev]);
       
+      // Clear the input field
+      setNewNote('');
+      
+      // Close the dialog
+      setIsAddingNote(false);
+      
       toast({
         title: "Note added",
         description: `A new note has been added for ${user.email}.`,
         variant: "default",
       });
-      
-      // Clear the note input and close the dialog
-      setNewNote('');
-      setShowAddNoteDialog(false);
-      
-      // Refresh the notes from the API to ensure we have the latest data
-      if (user.user_id) {
-        // Wait a bit longer to ensure the API has processed the new note
-        setTimeout(() => {
-          console.log('Refreshing notes from API after adding new note');
-          fetchUserNotes(user.user_id);
-        }, 2000); // Wait 2 seconds to allow the API to process the new note
-      }
-      
     } catch (err: any) {
       console.error('Error adding note:', err);
-      setError(`Failed to add note: ${err.message}`);
-      
       toast({
         title: "Failed to add note",
-        description: err.message || "There was an error adding a note to the user.",
+        description: err.message || "An unexpected error occurred.",
         variant: "destructive",
       });
     } finally {
       setIsAddingNote(false);
+    }
+  };
+  
+  // Handle deleting a note
+  const handleDeleteNote = (noteId: string) => {
+    if (!user) return;
+    
+    try {
+      // Determine the storage key based on userId
+      const storageKey = `chartNotes_user_${user.user_id}`;
+      console.log(`Deleting note ${noteId} using storage key:`, storageKey);
+      
+      // Load existing notes from localStorage
+      const savedNotes = localStorage.getItem(storageKey);
+      let existingNotes = savedNotes ? JSON.parse(savedNotes) : [];
+      
+      // Filter out the note to delete
+      const updatedNotes = existingNotes.filter((note: any) => note.id !== noteId);
+      
+      // Save the updated notes to localStorage
+      localStorage.setItem(storageKey, JSON.stringify(updatedNotes));
+      console.log('Updated notes after deletion:', updatedNotes);
+      
+      // Update the state
+      setUserNotes((prev: any[]) => prev.filter(note => note.id !== noteId));
+      
+      toast({
+        title: "Note deleted",
+        description: `The note has been deleted from ${user.email}'s profile.`,
+        variant: "default",
+      });
+    } catch (err: any) {
+      console.error('Error deleting note:', err);
+      toast({
+        title: "Failed to delete note",
+        description: err.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -902,176 +979,247 @@ export default function UserProfilePage({ params }: { params: Promise<{ email: s
           <Card className="border-0 shadow-md bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950 dark:to-gray-900 overflow-hidden">
             <CardContent className="p-0">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
-                {/* User Info */}
+                {/* User Info - 1/3 width */}
                 <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-indigo-400 dark:to-violet-400">User Profile</h2>
-              <p className="text-indigo-600 dark:text-indigo-400">User details and account information</p>
-            </div>
+                  <div>
+                    <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-indigo-400 dark:to-violet-400">User Profile</h2>
+                    <p className="text-indigo-600 dark:text-indigo-400">User details and account information</p>
+                  </div>
 
-            <div className="grid grid-cols-1 gap-4">
-              <div className="flex flex-col space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Email</Label>
-                <div className="flex items-center">
-                  <span className="font-medium">{user?.email}</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6 ml-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
-                    onClick={() => {
-                      navigator.clipboard.writeText(user?.email || '');
-                    }}
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex flex-col space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">User ID</Label>
-                <div className="flex items-center">
-                  <span className="font-medium text-indigo-700 dark:text-indigo-300">{user?.user_id}</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6 ml-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
-                    onClick={() => {
-                      navigator.clipboard.writeText(user?.user_id || '');
-                      toast({
-                        title: "Copied to clipboard",
-                        description: "User ID has been copied to clipboard",
-                      });
-                    }}
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex flex-col space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">API Key</Label>
-                <div className="flex items-center">
-                  <span className="font-medium text-blue-700 dark:text-blue-300 font-mono">{user?.access_key}</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6 ml-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                    onClick={() => {
-                      navigator.clipboard.writeText(user?.access_key || '');
-                      toast({
-                        title: "Copied to clipboard",
-                        description: "API Key has been copied to clipboard",
-                      });
-                    }}
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex flex-col space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Status</Label>
-                <div className="flex items-center">
-                  <Badge 
-                    className={`capitalize ${user?.status === 'active' 
-                      ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' 
-                      : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800'}`}
-                  >
-                    {user?.status}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="flex flex-col space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Plan Type</Label>
-                <div className="flex items-center">
-                  <Badge variant="outline" className={`capitalize ${getPlanTypeStyles(user?.plan_type || '')}`}>
-                    {user?.plan_type || 'No plan'}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="flex flex-col space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Credits</Label>
-                <div className="flex items-center">
-                  <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800">
-                    <Coins className="mr-1 h-3 w-3" />
-                    {user?.credits.toFixed(2)}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="flex flex-col space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Created</Label>
-                <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                  <CalendarDays className="mr-1 h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                  {user?.created_at ? formatTimestamp(user.created_at) : 'Unknown'}
-                </div>
-              </div>
-
-              <div className="flex flex-col space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Last Updated</Label>
-                <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                  <Clock className="mr-1 h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
-                  {user?.updated_at ? formatTimestamp(user.updated_at) : 'Unknown'}
-                </div>
-              </div>
-
-              <div className="flex flex-col space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Multiple Domains</Label>
-                <div className="flex items-center">
-                  <Badge 
-                    className={`capitalize ${user?.allow_multiple_domains 
-                      ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' 
-                      : 'bg-slate-50 dark:bg-slate-900/20 text-slate-700 dark:text-slate-400 border border-slate-200 dark:border-slate-800'}`}
-                  >
-                    {user?.allow_multiple_domains ? 'Allowed' : 'Not Allowed'}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-                </div>
-
-                {/* Domain Usage */}
-                <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">Domain Usage</h2>
-              <p className="text-blue-600 dark:text-blue-400">Domains used by this user</p>
-            </div>
-
-            {domainUsage ? (
-              <div className="space-y-4">
-                {/* Find the current user in the domain usage data */}
-                {(() => {
-                  // Find the user entry that matches the current user ID
-                  const currentUserDomains = domainUsage.users?.find(u => u.user_id === user?.user_id)?.domains || [];
-                  
-                  if (currentUserDomains.length > 0) {
-                    return (
-                      <div className="space-y-2">
-                        <Label className="text-xs text-slate-600 dark:text-slate-400">Registered Domains</Label>
-                        <div className="flex flex-wrap gap-2">
-                          {currentUserDomains.map((domain, index) => (
-                            <Badge key={index} variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800">
-                              {domain}
-                            </Badge>
-                          ))}
-                        </div>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="flex flex-col space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Email</Label>
+                      <div className="flex items-center">
+                        <span className="font-medium">{user?.email}</span>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 ml-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                          onClick={() => {
+                            navigator.clipboard.writeText(user?.email || '');
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
-                    );
-                  } else {
-                    return <p className="text-muted-foreground italic">No domains registered for this user</p>;
-                  }
-                })()}
-              </div>
-            ) : (
-              <p className="text-muted-foreground italic">No domain usage information available</p>
-            )}
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">User ID</Label>
+                      <div className="flex items-center">
+                        <span className="font-medium text-indigo-700 dark:text-indigo-300">{user?.user_id}</span>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 ml-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                          onClick={() => {
+                            navigator.clipboard.writeText(user?.user_id || '');
+                            toast({
+                              title: "Copied to clipboard",
+                              description: "User ID has been copied to clipboard",
+                            });
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">API Key</Label>
+                      <div className="flex items-center">
+                        <span className="font-medium text-blue-700 dark:text-blue-300 font-mono">{user?.access_key}</span>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 ml-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          onClick={() => {
+                            navigator.clipboard.writeText(user?.access_key || '');
+                            toast({
+                              title: "Copied to clipboard",
+                              description: "API Key has been copied to clipboard",
+                            });
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Status</Label>
+                      <div className="flex items-center">
+                        <Badge 
+                          className={`capitalize ${user?.status === 'active' 
+                            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' 
+                            : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800'}`}
+                        >
+                          {user?.status}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Plan Type</Label>
+                      <div className="flex items-center">
+                        <Badge variant="outline" className={`capitalize ${getPlanTypeStyles(user?.plan_type || '')}`}>
+                          {user?.plan_type || 'No plan'}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Credits</Label>
+                      <div className="flex items-center">
+                        <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800">
+                          <Coins className="mr-1 h-3 w-3" />
+                          {user?.credits.toFixed(2)}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Created</Label>
+                      <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
+                        <CalendarDays className="mr-1 h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                        {user?.created_at ? formatTimestamp(user.created_at) : 'Unknown'}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Last Updated</Label>
+                      <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
+                        <Clock className="mr-1 h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+                        {user?.updated_at ? formatTimestamp(user.updated_at) : 'Unknown'}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Multiple Domains</Label>
+                      <div className="flex items-center">
+                        <Badge 
+                          className={`capitalize ${user?.allow_multiple_domains 
+                            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' 
+                            : 'bg-slate-50 dark:bg-slate-900/20 text-slate-700 dark:text-slate-400 border border-slate-200 dark:border-slate-800'}`}
+                        >
+                          {user?.allow_multiple_domains ? 'Allowed' : 'Not Allowed'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 
-                {/* User Notes */}
-                <div className="space-y-6">
-                  <div className="flex justify-between items-center">
+                {/* Right column - 2/3 width with stacked sections */}
+                <div className="md:col-span-2 space-y-6">
+                  {/* User Actions with Edit User button to the right */}
+                  <div>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-rose-600 to-orange-600 dark:from-rose-400 dark:to-orange-400">User Actions</h2>
+                        <p className="text-rose-600 dark:text-rose-400">Manage this user account</p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        className="flex items-center justify-center bg-gradient-to-r from-indigo-50 to-white dark:from-indigo-950 dark:to-gray-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:shadow-md transition-all duration-200" 
+                        onClick={initializeEditForm}
+                      >
+                        <Edit className="mr-2 h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                        Edit User
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Horizontal action buttons */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    
+                    {showCreditDialog ? (
+                      <div className="md:col-span-3 p-4 border rounded-md bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950 dark:to-gray-900 border-emerald-200 dark:border-emerald-800 shadow-md">
+                        <h3 className="font-medium mb-2 text-emerald-700 dark:text-emerald-400">Add Credits</h3>
+                        <div className="flex items-center mb-4">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setCreditAmount(Math.max(0, creditAmount - 10))}
+                          >
+                            -10
+                          </Button>
+                          <input 
+                            type="number" 
+                            value={creditAmount}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCreditAmountChange(parseInt(e.target.value) || 0)}
+                            className="mx-2 p-2 w-20 text-center border rounded-md border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                            min="0"
+                          />
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setCreditAmount(creditAmount + 10)}
+                          >
+                            +10
+                          </Button>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button 
+                            onClick={handleAddCredits} 
+                            disabled={isAddingCredits}
+                            className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 dark:from-emerald-600 dark:to-green-600 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200"
+                          >
+                            {isAddingCredits ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Adding...
+                              </>
+                            ) : (
+                              'Confirm'
+                            )}
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            onClick={() => setShowCreditDialog(false)}
+                            disabled={isAddingCredits}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button 
+                        onClick={() => setShowCreditDialog(true)}
+                        disabled={isAddingCredits}
+                        className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 dark:from-emerald-600 dark:to-green-600 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200"
+                      >
+                        {isAddingCredits ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Adding...
+                          </>
+                        ) : (
+                          <>Add Credits</>
+                        )}
+                      </Button>
+                    )}
+
+                    <Button 
+                      onClick={handleToggleStatus}
+                      disabled={isAddingCredits}
+                      variant={user?.status === 'active' ? 'destructive' : 'default'}
+                    >
+                      {user?.status === 'active' ? 'Deactivate User' : 'Activate User'}
+                    </Button>
+
+                    <Button 
+                      onClick={handleDeleteUser}
+                      disabled={isAddingCredits}
+                      variant="destructive"
+                      className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 border-0 shadow-md hover:shadow-lg transition-all duration-200"
+                    >
+                      Delete User
+                    </Button>
+                  </div>
+                  
+                  {/* User Notes Section - Below User Actions */}
+                  <div className="space-y-4 mt-6">
+                    <div className="flex justify-between items-center">
                     <div>
                       <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400">User Notes</h2>
                       <p className="text-purple-600 dark:text-purple-400">Admin notes about this user</p>
@@ -1087,7 +1235,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ email: s
                     </Button>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-4 mt-4">
                     {isLoadingNotes ? (
                       <div className="flex justify-center py-4">
                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -1098,7 +1246,18 @@ export default function UserProfilePage({ params }: { params: Promise<{ email: s
                           <div key={note.id} className="p-3 rounded-md border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20">
                             <div className="flex justify-between items-start mb-1">
                               <div className="font-medium text-purple-700 dark:text-purple-400">{note.title}</div>
-                              <div className="text-xs text-slate-500 dark:text-slate-400">{note.formatted_date}</div>
+                              <div className="flex items-center space-x-2">
+                                <div className="text-xs text-slate-500 dark:text-slate-400">{note.formatted_date}</div>
+                                <button 
+                                  onClick={() => handleDeleteNote(note.id)}
+                                  className="text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 transition-colors"
+                                  title="Delete note"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
                             </div>
                             <p className="text-sm text-slate-700 dark:text-slate-300">{note.content}</p>
                           </div>
@@ -1110,127 +1269,44 @@ export default function UserProfilePage({ params }: { params: Promise<{ email: s
                   </div>
                 </div>
 
-                {/* User Actions */}
-                <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-rose-600 to-orange-600 dark:from-rose-400 dark:to-orange-400">User Actions</h2>
-              <p className="text-rose-600 dark:text-rose-400">Manage this user account</p>
-            </div>
+                  {/* Domain Usage Section - Below User Notes */}
+                  <div className="space-y-4 mt-6">
+                    <div>
+                      <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">Domain Usage</h2>
+                      <p className="text-blue-600 dark:text-blue-400">Domains associated with this user</p>
+                    </div>
 
-            <div className="space-y-6">
-              <Button 
-                variant="outline" 
-                className="w-full flex items-center justify-center bg-gradient-to-r from-indigo-50 to-white dark:from-indigo-950 dark:to-gray-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:shadow-md transition-all duration-200" 
-                onClick={initializeEditForm}
-              >
-                <Edit className="mr-2 h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                Edit User
-              </Button>
-              {showCreditDialog ? (
-                <div className="p-4 border rounded-md bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950 dark:to-gray-900 border-emerald-200 dark:border-emerald-800 shadow-md">
-                  <h3 className="font-medium mb-2 text-emerald-700 dark:text-emerald-400">Add Credits</h3>
-                  <div className="flex items-center mb-4">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setCreditAmount(Math.max(0, creditAmount - 10))}
-                    >
-                      -10
-                    </Button>
-                    <input 
-                      type="number" 
-                      value={creditAmount}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCreditAmountChange(parseInt(e.target.value) || 0)}
-                      className="mx-2 p-2 w-20 text-center border rounded-md border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      min="0"
-                    />
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setCreditAmount(creditAmount + 10)}
-                    >
-                      +10
-                    </Button>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button 
-                      onClick={handleAddCredits} 
-                      disabled={isAddingCredits}
-                      className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 dark:from-emerald-600 dark:to-green-600 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200"
-                    >
-                      {isAddingCredits ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Adding...
-                        </>
+                    <div className="mt-4">
+                      {domainUsage ? (
+                        <div className="space-y-4">
+                          {/* Find the current user in the domain usage data */}
+                          {(() => {
+                            // Find the user entry that matches the current user ID
+                            const currentUserDomains = domainUsage.users?.find(u => u.user_id === user?.user_id)?.domains || [];
+                            
+                            if (currentUserDomains.length > 0) {
+                              return (
+                                <div className="space-y-2">
+                                  <Label className="text-xs text-slate-600 dark:text-slate-400">Registered Domains</Label>
+                                  <div className="flex flex-wrap gap-2">
+                                    {currentUserDomains.map((domain, index) => (
+                                      <Badge key={index} variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+                                        {domain}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              return <p className="text-muted-foreground italic">No domains registered for this user</p>;
+                            }
+                          })()}
+                        </div>
                       ) : (
-                        'Confirm'
+                        <p className="text-muted-foreground italic">No domain usage information available</p>
                       )}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setShowCreditDialog(false)}
-                      disabled={isAddingCredits}
-                    >
-                      Cancel
-                    </Button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="group relative overflow-hidden rounded-md border border-emerald-200 dark:border-emerald-800 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950 dark:to-gray-900 p-1 hover:shadow-md transition-all duration-200">
-                  <div className="p-2">
-                    <h3 className="font-medium mb-1 text-emerald-700 dark:text-emerald-400">Add Credits</h3>
-                    <p className="text-sm text-emerald-600 dark:text-emerald-500 mb-3">Add credits to this user's account</p>
-                    <Button 
-                      onClick={() => setShowCreditDialog(true)}
-                      disabled={isAddingCredits}
-                      className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 dark:from-emerald-600 dark:to-green-600 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200 w-full"
-                    >
-                      {isAddingCredits ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Adding...
-                        </>
-                      ) : (
-                        'Add Credits'
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              <div className="group relative overflow-hidden rounded-md border border-amber-200 dark:border-amber-800 bg-gradient-to-br from-amber-50 to-white dark:from-amber-950 dark:to-gray-900 p-1 hover:shadow-md transition-all duration-200">
-                <div className="p-2">
-                  <h3 className="font-medium mb-1 text-amber-700 dark:text-amber-400">Toggle Status</h3>
-                  <p className="text-sm text-amber-600 dark:text-amber-500 mb-3">
-                    {user?.status === 'active' ? 'Deactivate this user' : 'Activate this user'}
-                  </p>
-                  <Button 
-                    onClick={handleToggleStatus}
-                    disabled={isAddingCredits}
-                    variant={user?.status === 'active' ? 'destructive' : 'default'}
-                    className="w-full"
-                  >
-                    {user?.status === 'active' ? 'Deactivate User' : 'Activate User'}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="group relative overflow-hidden rounded-md border border-rose-200 dark:border-rose-800 bg-gradient-to-br from-rose-50 to-white dark:from-rose-950 dark:to-gray-900 p-1 hover:shadow-md transition-all duration-200">
-                <div className="p-2">
-                  <h3 className="font-medium mb-1 text-rose-700 dark:text-rose-400">Delete User</h3>
-                  <p className="text-sm text-rose-600 dark:text-rose-500 mb-3">Permanently delete this user account</p>
-                  <Button 
-                    onClick={handleDeleteUser}
-                    disabled={isAddingCredits}
-                    variant="destructive"
-                    className="w-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 border-0 shadow-md hover:shadow-lg transition-all duration-200"
-                  >
-                    Delete User
-                  </Button>
-                </div>
-              </div>
-            </div>
                 </div>
               </div>
             </CardContent>
