@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ interface ApiUsageResponse {
 }
 
 export function UserAnalytics() {
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [userApiUsage, setUserApiUsage] = useState<ApiUsageData[]>([]);
@@ -42,6 +44,11 @@ export function UserAnalytics() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   
   const { toast } = useToast();
+  
+  // Function to navigate to user profile page
+  const navigateToUserProfile = (email: string) => {
+    router.push(`/dashboard/users/${encodeURIComponent(email)}`);
+  };
 
   // Fetch users
   const fetchUsers = async () => {
@@ -246,17 +253,26 @@ export function UserAnalytics() {
                 </div>
               ) : (
                 filteredUsers.map(user => (
-                  <Button
-                    key={user.user_id}
-                    variant={selectedUserId === user.user_id ? "default" : "outline"}
-                    className="h-auto py-3 px-4 justify-start"
-                    onClick={() => setSelectedUserId(user.user_id)}
-                  >
-                    <div className="flex flex-col items-start text-left">
-                      <div className="font-medium truncate max-w-[200px]">{user.email}</div>
-                      <div className="text-xs text-muted-foreground">{user.access_key}</div>
-                    </div>
-                  </Button>
+                  <div key={user.user_id} className="flex flex-col gap-2">
+                    <Button
+                      variant={selectedUserId === user.user_id ? "default" : "outline"}
+                      className="h-auto py-3 px-4 justify-start w-full"
+                      onClick={() => setSelectedUserId(user.user_id)}
+                    >
+                      <div className="flex flex-col items-start text-left">
+                        <div className="font-medium truncate max-w-[200px]">{user.email}</div>
+                        <div className="text-xs text-muted-foreground">{user.access_key}</div>
+                      </div>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white border-0 shadow-md"
+                      onClick={() => navigateToUserProfile(user.email)}
+                    >
+                      View Profile
+                    </Button>
+                  </div>
                 ))
               )}
             </div>
@@ -277,6 +293,14 @@ export function UserAnalytics() {
                 <div className="flex items-center gap-2">
                   <UserRound className="h-5 w-5 text-primary" />
                   <div className="text-lg font-medium truncate">{selectedUser?.email}</div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="ml-auto bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white border-0 shadow-md"
+                    onClick={() => selectedUser && navigateToUserProfile(selectedUser.email)}
+                  >
+                    View Profile
+                  </Button>
                 </div>
               </CardContent>
             </Card>

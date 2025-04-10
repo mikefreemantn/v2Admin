@@ -30,9 +30,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 
-// API key for accessing the ReIntent API
-const API_KEY = 'ri_5437c19aa7de';
-const API_BASE_URL = 'https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1';
+// Use our proxy API route instead of direct API calls
+const API_PROXY_URL = '/api/proxy';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -76,25 +75,37 @@ export default function DashboardPage() {
     checkAuth();
   }, [router]);
 
-  // Fetch users data
+  // Fetch users data using the proxy API route
   const fetchUsers = async () => {
     setIsLoadingUsers(true);
     setError(null);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/users?key=${API_KEY}`);
+      // Add a cache-busting parameter to ensure fresh data
+      const timestamp = new Date().getTime();
+      const response = await fetch(`${API_PROXY_URL}?_t=${timestamp}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          endpoint: '/admin/users',
+          method: 'GET'
+        })
+      });
       
       if (!response.ok) {
         throw new Error(`API request failed with status ${response.status}`);
       }
       
-      const data = await response.json();
-      const usersList = data.users || [];
+      const responseBody = await response.json();
+      const data = responseBody.data; // The actual API response is in the data property
+      const usersList = data?.users || [];
       setUsers(usersList);
       setFilteredUsers(usersList);
       
       // Store domain usage data
-      if (data.domain_usage) {
+      if (data?.domain_usage) {
         setDomainUsage(data.domain_usage);
         console.log('Domain usage data loaded:', data.domain_usage);
       }
@@ -158,7 +169,8 @@ export default function DashboardPage() {
     
     try {
       // Use the proxy API to avoid CORS issues
-      const response = await fetch('/api/proxy', {
+      const timestamp = new Date().getTime();
+      const response = await fetch(`${API_PROXY_URL}?_t=${timestamp}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

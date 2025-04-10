@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -42,7 +42,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Badge } from "@/components/ui/badge";
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import {
   Table,
   TableBody,
@@ -68,13 +69,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 
 // API key for accessing the ReIntent API
-const API_KEY = 'ri_5437c19aa7de';
+const API_KEY = 'ri_9fbcb675c4e1';
 const API_BASE_URL = 'https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1';
 
 // Number of items per page for credit history pagination
@@ -122,7 +124,7 @@ interface CreditTransaction {
   date: string;
 }
 
-export default function UserProfilePage({ params }: { params: { email: string } }) {
+export default function UserProfilePage({ params }: { params: Promise<{ email: string }> | { email: string } }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [domainUsage, setDomainUsage] = useState<DomainUsage | null>(null);
@@ -156,15 +158,23 @@ export default function UserProfilePage({ params }: { params: { email: string } 
   // Get toast function
   const { toast } = useToast();
 
-  // Credit history state
+  // State for credit history
   const [creditHistory, setCreditHistory] = useState<CreditTransaction[]>([]);
-  const [isLoadingCreditHistory, setIsLoadingCreditHistory] = useState(false);
+  const [isLoadingCreditHistory, setIsLoadingCreditHistory] = useState<boolean>(false);
+  
+  // State for user notes
+  const [userNotes, setUserNotes] = useState<any[]>([]);
+  const [isLoadingNotes, setIsLoadingNotes] = useState<boolean>(false);
+  const [newNote, setNewNote] = useState<string>('');
+  const [isAddingNote, setIsAddingNote] = useState<boolean>(false);
+  const [showAddNoteDialog, setShowAddNoteDialog] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalHistoryItems, setTotalHistoryItems] = useState(0);
   const itemsPerPage = ITEMS_PER_PAGE;
   
-  // Decode the email from URL
-  const decodedEmail = decodeURIComponent(params.email);
+  // Decode the email from URL using React.use() to unwrap params if it's a Promise
+  const emailParam = 'then' in params ? React.use(params as Promise<{ email: string }>) : params;
+  const decodedEmail = decodeURIComponent(emailParam.email);
   // Check authentication and fetch user data
   useEffect(() => {
     const checkAuth = async () => {
@@ -172,8 +182,10 @@ export default function UserProfilePage({ params }: { params: { email: string } 
         await configureAmplifyClient();
         const currentUser = await getCurrentUser();
         
-        // Fetch user data
-        await fetchUserData(decodedEmail);
+        // Fetch user data when authentication is successful
+        if (decodedEmail) {
+          await fetchUserData(decodedEmail);
+        }
       } catch (err) {
         console.error('Authentication error:', err);
         router.push('/login');
@@ -185,22 +197,36 @@ export default function UserProfilePage({ params }: { params: { email: string } 
     checkAuth();
   }, [decodedEmail, router]);
   
+  // Fetch user notes when user data is loaded
+  useEffect(() => {
+    if (user?.user_id) {
+      fetchUserNotes(user.user_id);
+    }
+  }, [user?.user_id]);
+  
   // Fetch user data from API
-  const fetchUserData = async (email: string) => {
+  const fetchUserData = async (email: string, skipCache = true) => {
     try {
       setLoading(true);
-      console.log('Fetching user data for email:', email);
+      console.log('Fetching user data for email:', email, 'skipCache:', skipCache);
+      
+      // Add a timestamp to bust the cache
+      const timestamp = new Date().getTime();
       
       // Use proxy endpoint to avoid CORS issues with the correct admin endpoint
       const response = await fetch('/api/proxy', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         },
         body: JSON.stringify({
-          endpoint: `${API_BASE_URL}/admin/users`,
+          endpoint: `${API_BASE_URL}/admin/users?_=${timestamp}`,
           method: 'GET',
-          apiKey: API_KEY
+          apiKey: API_KEY,
+          skipCache: skipCache // Explicitly tell the proxy to skip cache
         }),
       });
       
@@ -285,6 +311,9 @@ export default function UserProfilePage({ params }: { params: { email: string } 
       setIsLoadingCreditHistory(true);
       console.log('Fetching credit history for user ID:', userId);
       
+      // Add a timestamp to bust the cache
+      const timestamp = new Date().getTime();
+      
       // Use proxy endpoint to avoid CORS issues with the correct admin endpoint
       const response = await fetch('/api/proxy', {
         method: 'POST',
@@ -292,46 +321,185 @@ export default function UserProfilePage({ params }: { params: { email: string } 
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          endpoint: `${API_BASE_URL}/admin/users/${userId}/credit-history`,
+          endpoint: `/admin/users/${userId}/credit-history`,
           method: 'GET',
-          apiKey: API_KEY
+          apiKey: API_KEY,
+          skipCache: true // Always skip cache for credit history
         }),
       });
       
       if (!response.ok) {
+        console.error('API response not OK:', response.status, response.statusText);
         throw new Error(`Failed to fetch credit history: ${response.status}`);
       }
       
-      const data = await response.json();
-      console.log('Credit history response:', data);
+      const responseData = await response.json();
+      console.log('Credit history raw response:', responseData);
       
-      // Check if the response has the expected format
-      if (data.data && data.data.history) {
-        setCreditHistory(data.data.history);
-        setTotalHistoryItems(data.data.history.length || 0);
-      } else if (data.history) {
-        // Direct response format
-        setCreditHistory(data.history);
-        setTotalHistoryItems(data.history.length || 0);
+      // Extract the actual data from the proxy response
+      const data = responseData.data || {};
+      console.log('Extracted data from proxy response:', data);
+      
+      // According to the API documentation, the credit history should be in the 'history' field
+      let transactions = [];
+      
+      if (data && Array.isArray(data.history)) {
+        console.log('Found history array as documented in API:', data.history);
+        transactions = data.history;
+      } else if (data && Array.isArray(data.transactions)) {
+        console.log('Found transactions array in response:', data.transactions);
+        transactions = data.transactions;
+      } else if (Array.isArray(data)) {
+        console.log('Data is directly an array of transactions:', data);
+        transactions = data;
       } else {
-        // Fallback
+        console.error('Could not find transactions array in expected format:', data);
+        // Try to find any array in the response
+        for (const key in data) {
+          if (Array.isArray(data[key])) {
+            console.log(`Found array in data.${key}, trying to use it:`, data[key]);
+            transactions = data[key];
+            break;
+          }
+        }
+      }
+      
+      console.log('Final extracted transactions:', transactions);
+      
+      if (transactions && transactions.length > 0) {
+        // Process the transactions to add formatted dates
+        const processedTransactions = transactions.map((transaction: CreditTransaction) => {
+          // Convert timestamp to formatted date
+          const date = new Date(transaction.timestamp * 1000);
+          return {
+            ...transaction,
+            date: date.toLocaleDateString('en-US', { 
+              year: 'numeric', 
+              month: 'short', 
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+          };
+        });
+        
+        console.log('Processed transactions:', processedTransactions);
+        setCreditHistory(processedTransactions);
+        setTotalHistoryItems(processedTransactions.length);
+      } else {
+        console.warn('No transactions found in response');
         setCreditHistory([]);
         setTotalHistoryItems(0);
-        console.error('Unexpected credit history format:', data);
       }
     } catch (err: any) {
       console.error('Error fetching credit history:', err);
-      setError(`Failed to fetch credit history: ${err.message}`);
+      setCreditHistory([]);
+      setTotalHistoryItems(0);
     } finally {
       setIsLoadingCreditHistory(false);
     }
   };
-  // Format timestamp to readable date
+
+  // Fetch user notes from API
+  const fetchUserNotes = async (userId: string) => {
+    try {
+      setIsLoadingNotes(true);
+      console.log('Fetching notes for user ID:', userId);
+      
+      // Make a direct API call to the documented endpoint
+      const directApiUrl = `${API_BASE_URL}/admin/chart-notes?key=${API_KEY}&user_id=${userId}`;
+      console.log('Making direct API call to fetch notes:', directApiUrl);
+      
+      const response = await fetch(directApiUrl);
+      
+      if (!response.ok) {
+        console.error('API response not OK:', response.status, response.statusText);
+        throw new Error(`Failed to fetch user notes: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('User notes raw response:', data);
+      
+      // Check if notes are in the expected format as per the API documentation
+      if (Array.isArray(data.notes)) {
+        console.log('Found notes in the expected format:', data.notes);
+        
+        // Process notes to add formatted dates
+        const processedNotes = data.notes.map((note: any) => {
+          // Convert created_at timestamp to formatted date if it exists
+          let formattedDate = '';
+          if (note.created_at) {
+            const date = new Date(note.created_at * 1000);
+            formattedDate = date.toLocaleDateString('en-US', { 
+              year: 'numeric', 
+              month: 'short', 
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+          }
+          
+          return {
+            ...note,
+            formatted_date: formattedDate || note.date
+          };
+        });
+        
+        // Sort notes by created_at timestamp in descending order (newest first)
+        processedNotes.sort((a: any, b: any) => {
+          return (b.created_at || 0) - (a.created_at || 0);
+        });
+        
+        console.log('Processed and sorted notes:', processedNotes);
+        setUserNotes(processedNotes);
+      } else {
+        console.warn('No notes found or invalid format:', data);
+        setUserNotes([]);
+      }
+    } catch (err: any) {
+      console.error('Error fetching user notes:', err);
+      setUserNotes([]);
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  };
+
+  // Since we're in April 2025, we're in Daylight Saving Time (CDT)
+  // CDT is UTC-5 hours
+  const centralTimeOffset = -5;
+  const timezoneName = 'CDT';
+  
+  // Format timestamp to readable date in Central Time (CDT/CST)
   const formatTimestamp = (timestamp: number) => {
     try {
-      return format(new Date(timestamp * 1000), 'MMM d, yyyy h:mm a');
+      // Create a date from the timestamp (which is in seconds)
+      // The timestamp is in UTC/GMT
+      const utcDate = new Date(timestamp * 1000);
+      
+      // Apply the Central Time offset (either -5 for CDT or -6 for CST)
+      const centralDate = new Date(utcDate.getTime() + (centralTimeOffset * 60 * 60 * 1000));
+      
+      // Format the date with the correct timezone abbreviation
+      return format(centralDate, 'MMM d, yyyy h:mm a') + ' ' + timezoneName;
     } catch (err) {
       console.error('Error formatting timestamp:', err);
+      return 'Invalid date';
+    }
+  };
+  
+  // Format ISO date string to Central Time
+  const formatIsoDate = (isoDateString: string) => {
+    try {
+      // Parse the ISO date string (which is in UTC/GMT)
+      const utcDate = new Date(isoDateString);
+      
+      // Adjust for Central Time
+      const centralDate = new Date(utcDate.getTime() + centralTimeOffset * 60 * 60 * 1000);
+      
+      // Format the date with the correct timezone abbreviation
+      return format(centralDate, 'MMM d, yyyy h:mm a') + ' ' + timezoneName;
+    } catch (err) {
+      console.error('Error formatting ISO date:', err);
       return 'Invalid date';
     }
   };
@@ -359,6 +527,7 @@ export default function UserProfilePage({ params }: { params: { email: string } 
       });
       
       if (!response.ok) {
+        console.error('API response not OK:', response.status, response.statusText);
         throw new Error(`Failed to add credits: ${response.status}`);
       }
       
@@ -383,41 +552,173 @@ export default function UserProfilePage({ params }: { params: { email: string } 
     }
   };
 
+  // Handle adding a new note
+  const handleAddNote = async () => {
+    if (!user || !newNote.trim()) return;
+    
+    setIsAddingNote(true);
+    
+    try {
+      // Get current admin user's name (for this example, hardcoding "Mike Freeman")
+      const adminName = "Mike Freeman";
+      
+      // Create a note with the admin's name appended
+      const noteWithSignature = `${newNote.trim()} - ${adminName}`;
+      
+      console.log(`Adding new note for user ${user.email}: ${noteWithSignature}`);
+      
+      // Create the note payload according to the API documentation
+      const noteData = {
+        title: `Note for ${user.email}`,
+        content: noteWithSignature,
+        date: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
+        context: 'user',
+        user_id: user.user_id
+      };
+      
+      console.log('Sending note data to API:', noteData);
+      
+      // Make a direct API call to create the note
+      const directApiUrl = `${API_BASE_URL}/admin/chart-notes?key=${API_KEY}`;
+      console.log('Making direct API call to create note:', directApiUrl);
+      
+      const response = await fetch(directApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(noteData)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to add note:', response.status, errorText);
+        throw new Error(`Failed to add note: ${response.status}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('Note creation response:', responseData);
+      
+      // Create a note object with the response data or fallback to our data
+      const newNoteData = responseData.note || {
+        id: `note_${Date.now()}`,
+        ...noteData,
+        created_at: Math.floor(Date.now() / 1000)
+      };
+      
+      // Format the date for display
+      const formattedNote = {
+        ...newNoteData,
+        formatted_date: new Date().toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'short', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      };
+      
+      console.log('Adding formatted note to state:', formattedNote);
+      
+      // Add the new note to the state
+      setUserNotes(prev => [formattedNote, ...prev]);
+      
+      toast({
+        title: "Note added",
+        description: `A new note has been added for ${user.email}.`,
+        variant: "default",
+      });
+      
+      // Clear the note input and close the dialog
+      setNewNote('');
+      setShowAddNoteDialog(false);
+      
+      // Refresh the notes from the API to ensure we have the latest data
+      if (user.user_id) {
+        // Wait a bit longer to ensure the API has processed the new note
+        setTimeout(() => {
+          console.log('Refreshing notes from API after adding new note');
+          fetchUserNotes(user.user_id);
+        }, 2000); // Wait 2 seconds to allow the API to process the new note
+      }
+      
+    } catch (err: any) {
+      console.error('Error adding note:', err);
+      setError(`Failed to add note: ${err.message}`);
+      
+      toast({
+        title: "Failed to add note",
+        description: err.message || "There was an error adding a note to the user.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingNote(false);
+    }
+  };
+
   // Handle toggling user status (active/inactive)
   const handleToggleStatus = async () => {
     if (!user) return;
     
     try {
+      // Create the new status
       const newStatus = user.status === 'active' ? 'inactive' : 'active';
       
+      // Include ALL required fields from the current user object
+      const updateData = {
+        status: newStatus,
+        credits: user.credits,
+        plan_type: user.plan_type,
+        allow_multiple_domains: user.allow_multiple_domains
+      };
+      
+      console.log('Toggling user status to:', newStatus, 'with complete payload:', updateData);
+      
+      // Use the proxy endpoint with the correct format and complete data
       const response = await fetch('/api/proxy', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          endpoint: `${API_BASE_URL}/admin/users/${user.user_id}`,
+          endpoint: `/admin/users/${user.user_id}`,
           method: 'PUT',
           apiKey: API_KEY,
-          data: {
-            status: newStatus
-          }
+          data: updateData,
+          skipCache: true
         }),
       });
       
-      if (!response.ok) {
-        throw new Error(`Failed to update status: ${response.status}`);
+      const responseBody = await response.json();
+      console.log('Full proxy response:', responseBody);
+      
+      // The proxy returns a wrapper object with status, statusText, and data properties
+      if (responseBody.status !== 200) {
+        console.error('API response not OK:', responseBody.status, responseBody.data);
+        throw new Error(`API request failed with status ${responseBody.status}: ${JSON.stringify(responseBody.data)}`);
       }
       
-      // Update user state with new status
-      setUser({
-        ...user,
-        status: newStatus
+      // Update local user state with the new status
+      setUser(prev => prev ? { ...prev, status: newStatus } : null);
+      
+      toast({
+        title: "Status updated",
+        description: `User has been ${newStatus === 'active' ? 'activated' : 'deactivated'}.`,
+        variant: "default",
       });
+      
+      // Refresh user data to ensure we have the latest information
+      await fetchUserData(decodedEmail, true);
       
     } catch (err: any) {
       console.error('Error updating user status:', err);
       setError(`Failed to update status: ${err.message}`);
+      
+      toast({
+        title: "Failed to update status",
+        description: err.message || "There was an error updating the user's status.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -489,17 +790,35 @@ export default function UserProfilePage({ params }: { params: { email: string } 
     setIsUpdatingUser(true);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/users/${user.user_id}?key=${API_KEY}`, {
-        method: 'PUT',
+      console.log('Updating user with data:', editedUser);
+      
+      // Use the proxy endpoint to avoid CORS issues
+      const response = await fetch('/api/proxy', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editedUser),
+        body: JSON.stringify({
+          endpoint: `/admin/users/${user.user_id}`,
+          method: 'PUT',
+          apiKey: API_KEY,
+          data: editedUser,
+          skipCache: true // Ensure we're not using cached data
+        }),
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+        console.error('API response not OK:', response.status, data);
+        throw new Error(`API request failed with status ${response.status}: ${JSON.stringify(data)}`);
       }
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      console.log('User update response:', data);
       
       // Update local user state with the edited values
       setUser(prev => prev ? { ...prev, ...editedUser } : null);
@@ -507,14 +826,18 @@ export default function UserProfilePage({ params }: { params: { email: string } 
       toast({
         title: "User updated successfully",
         description: "The user's information has been updated.",
+        variant: "default",
       });
       
+      // Refresh user data to ensure we have the latest information
+      await fetchUserData(decodedEmail);
+      
       setShowEditDialog(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating user:', err);
       toast({
         title: "Failed to update user",
-        description: "There was an error updating the user's information.",
+        description: err.message || "There was an error updating the user's information.",
         variant: "destructive",
       });
     } finally {
@@ -718,24 +1041,73 @@ export default function UserProfilePage({ params }: { params: { email: string } 
 
             {domainUsage ? (
               <div className="space-y-4">
-                {domainUsage.users && domainUsage.users.length > 0 && domainUsage.users[0].domains && domainUsage.users[0].domains.length > 0 ? (
-                  <div className="space-y-2">
-                    <Label className="text-xs text-slate-600 dark:text-slate-400">Registered Domains</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {domainUsage.users[0].domains.map((domain, index) => (
-                        <Badge key={index} variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800">
-                          {domain}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground italic">No domains registered</p>
-                )}
+                {/* Find the current user in the domain usage data */}
+                {(() => {
+                  // Find the user entry that matches the current user ID
+                  const currentUserDomains = domainUsage.users?.find(u => u.user_id === user?.user_id)?.domains || [];
+                  
+                  if (currentUserDomains.length > 0) {
+                    return (
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-600 dark:text-slate-400">Registered Domains</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {currentUserDomains.map((domain, index) => (
+                            <Badge key={index} variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+                              {domain}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    return <p className="text-muted-foreground italic">No domains registered for this user</p>;
+                  }
+                })()}
               </div>
             ) : (
               <p className="text-muted-foreground italic">No domain usage information available</p>
             )}
+                </div>
+                
+                {/* User Notes */}
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400">User Notes</h2>
+                      <p className="text-purple-600 dark:text-purple-400">Admin notes about this user</p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="bg-gradient-to-r from-purple-50 to-white dark:from-purple-950 dark:to-gray-900 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:shadow-md transition-all duration-200"
+                      onClick={() => setShowAddNoteDialog(true)}
+                    >
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      Add Note
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {isLoadingNotes ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : userNotes.length > 0 ? (
+                      <div className="space-y-3">
+                        {userNotes.map((note) => (
+                          <div key={note.id} className="p-3 rounded-md border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20">
+                            <div className="flex justify-between items-start mb-1">
+                              <div className="font-medium text-purple-700 dark:text-purple-400">{note.title}</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400">{note.formatted_date}</div>
+                            </div>
+                            <p className="text-sm text-slate-700 dark:text-slate-300">{note.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground italic">No notes available for this user</p>
+                    )}
+                  </div>
                 </div>
 
                 {/* User Actions */}
@@ -768,7 +1140,7 @@ export default function UserProfilePage({ params }: { params: { email: string } 
                     <input 
                       type="number" 
                       value={creditAmount}
-                      onChange={(e) => handleCreditAmountChange(parseInt(e.target.value) || 0)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCreditAmountChange(parseInt(e.target.value) || 0)}
                       className="mx-2 p-2 w-20 text-center border rounded-md border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       min="0"
                     />
@@ -900,7 +1272,7 @@ export default function UserProfilePage({ params }: { params: { email: string } 
                           .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                           .map((transaction, index) => (
                             <TableRow key={index}>
-                              <TableCell>{transaction.date || formatTimestamp(transaction.timestamp)}</TableCell>
+                              <TableCell>{transaction.date ? formatIsoDate(transaction.date) : formatTimestamp(transaction.timestamp)}</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className="capitalize">
                                   {transaction.service}
@@ -1031,7 +1403,7 @@ export default function UserProfilePage({ params }: { params: { email: string } 
                     <Switch
                       id="allow_multiple_domains"
                       checked={editedUser.allow_multiple_domains}
-                      onCheckedChange={(checked) => handleEditFormChange('allow_multiple_domains', checked)}
+                      onCheckedChange={(checked: boolean) => handleEditFormChange('allow_multiple_domains', checked)}
                     />
                     <Label htmlFor="allow_multiple_domains" className="text-sm text-muted-foreground">
                       Allow user to register multiple domains
@@ -1055,6 +1427,45 @@ export default function UserProfilePage({ params }: { params: { email: string } 
                       <Save className="mr-2 h-4 w-4" />
                       Save Changes
                     </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
+          {/* Add Note Dialog */}
+          <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Add Note</DialogTitle>
+                <DialogDescription>
+                  Add a new note for this user. Your name will be automatically added to the end of the note.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-1 gap-2">
+                  <Label htmlFor="note-content">Note Content</Label>
+                  <Textarea
+                    id="note-content"
+                    placeholder="Enter your note here..."
+                    value={newNote}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewNote(e.target.value)}
+                    className="min-h-[100px]"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAddNoteDialog(false)} disabled={isAddingNote}>
+                  Cancel
+                </Button>
+                <Button type="submit" onClick={handleAddNote} disabled={isAddingNote || !newNote.trim()}>
+                  {isAddingNote ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    'Add Note'
                   )}
                 </Button>
               </DialogFooter>

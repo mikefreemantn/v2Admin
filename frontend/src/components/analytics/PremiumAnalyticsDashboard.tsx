@@ -229,11 +229,7 @@ export function PremiumAnalyticsDashboard() {
   const getServices = () => {
     const services = new Set<string>();
     
-    // Ensure we always have these key services even if they're not in the data
-    services.add('chatgpt');
-    services.add('firecrawl');
-    services.add('dalle');
-    
+    // Only include services that actually appear in the data
     apiUsage.forEach(item => {
       Object.keys(item.by_service || {}).forEach(service => {
         services.add(service);
@@ -264,81 +260,56 @@ export function PremiumAnalyticsDashboard() {
     const filteredData = getFilteredData();
     const services = getServices();
     
-    // If we have no real data, create some sample data
+    // If we have no real data, return empty array
     if (filteredData.length === 0) {
-      return generateSampleData(services);
+      console.log('No data available');
+      return [];
     }
     
+    console.log('Using actual API data for charts');
     return filteredData.map(item => {
       const formattedDate = format(parseISO(item.date), 'MMM d');
       const result: any = { date: formattedDate };
       
       services.forEach(service => {
         if (item.by_service && item.by_service[service]) {
+          // Use actual data when available
           result[getServiceDisplayName(service)] = item.by_service[service];
         } else {
-          // Add small random values for empty services to make chart more interesting
-          result[getServiceDisplayName(service)] = service === 'chatgpt' ? 
-            Math.floor(Math.random() * 50) + 50 : 
-            Math.floor(Math.random() * 30) + 10;
+          // Use zero for services with no data
+          result[getServiceDisplayName(service)] = 0;
         }
       });
       
-      // Ensure Total is at least the sum of all services
+      // Calculate Total as the sum of all services
       const servicesSum = services.reduce((sum, service) => {
         return sum + (result[getServiceDisplayName(service)] || 0);
       }, 0);
       
+      // Use the larger of the calculated sum or the reported total
       result['Total'] = Math.max(item.count || 0, servicesSum);
       
       return result;
     });
   };
   
-  // Generate sample data if real data is missing
-  const generateSampleData = (services: string[]) => {
-    const today = new Date();
-    const sampleData = [];
-    
-    // Generate 14 days of sample data (fewer points for better readability)
-    for (let i = 13; i >= 0; i--) {
-      const date = format(subDays(today, i), 'MMM d');
-      const dataPoint: any = { date };
-      
-      // Generate a base value that creates a wave pattern
-      const baseValue = 100 + Math.sin(i / 2) * 80 + Math.random() * 20;
-      
-      // Make sure each service has a unique pattern and significant value
-      // ChatGPT - highest usage with a wave pattern
-      dataPoint['ChatGPT'] = Math.floor(baseValue * 1.5 + 100);
-      
-      // DALL-E - medium-high usage with a different wave pattern
-      dataPoint['DALL-E'] = Math.floor(baseValue * 0.7 + Math.sin(i / 1.5) * 60);
-      
-      // FireCrawl - medium usage with yet another pattern
-      dataPoint['FireCrawl'] = Math.floor(baseValue * 0.5 + Math.cos(i / 2) * 40);
-      
-      // Whisper - lower but still visible usage
-      dataPoint['Whisper'] = Math.floor(baseValue * 0.3 + Math.sin(i) * 25);
-      
-      // Embeddings - lowest but still visible
-      dataPoint['Embeddings'] = Math.floor(baseValue * 0.2 + Math.cos(i / 3) * 15);
-      
-      // Calculate total
-      let total = 0;
-      Object.keys(dataPoint).forEach(key => {
-        if (key !== 'date' && key !== 'Total') {
-          total += dataPoint[key];
-        }
-      });
-      
-      dataPoint['Total'] = total;
-      
-      sampleData.push(dataPoint);
-    }
-    
-    return sampleData;
+  // Show a message when no data is available
+  const showNoDataMessage = () => {
+    toast({
+      title: "No Data Available",
+      description: "There is no API usage data available for the selected time period.",
+      variant: "destructive"
+    });
   };
+  
+  // Show no data message when needed
+  useEffect(() => {
+    const filteredData = getFilteredData();
+    if (filteredData.length === 0 && apiUsage.length > 0) {
+      // Only show the message if we've already loaded data but nothing matches the filter
+      showNoDataMessage();
+    }
+  }, [dateRange, apiUsage.length, toast]);
 
   // Calculate service totals for donut chart
   const calculateServiceTotals = () => {
