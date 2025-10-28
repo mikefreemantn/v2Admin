@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_BASE_URL = 'https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1';
-const API_KEY = 'ri_9fbcb675c4e1';
+const API_KEY = 'ri_5437c19aa7de';
 
 // Configure the route to allow longer execution time
 export const maxDuration = 30; // 30 seconds
