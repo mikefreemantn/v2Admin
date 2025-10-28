@@ -9,9 +9,7 @@ const nextConfig: NextConfig = {
     // Ignore TypeScript errors during production build
     ignoreBuildErrors: true,
   },
-  // Configure for AWS Amplify deployment
-  output: 'standalone',
-  // Configure images for AWS
+  // Configure images
   images: {
     unoptimized: true,
   },
