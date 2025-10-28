@@ -147,61 +147,42 @@ export function PremiumAnalyticsDashboard() {
     }
   };
 
-  // Fetch top users
+  // Fetch top users using the optimized endpoint
   const fetchTopUsers = async (allUsers: User[]) => {
     try {
-      // For each user, fetch their API usage
-      const userPromises = allUsers.slice(0, 10).map(async (user: User) => {
-        try {
-          const response = await fetch('/api/proxy', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              endpoint: '/admin/api-usage',
-              method: 'GET',
-              queryParams: {
-                user_id: user.user_id,
-              },
-            }),
-          });
-          
-          const data = await response.json();
-          
-          if (!response.ok || data.error) {
-            return {
-              name: user.email,
-              value: 0,
-              user_id: user.user_id,
-            };
-          }
-          
-          return {
-            name: user.email,
-            value: data.data.total_calls || 0,
-            user_id: user.user_id,
-          };
-        } catch (err) {
-          console.error(`Error fetching API usage for user ${user.user_id}:`, err);
-          return {
-            name: user.email,
-            value: 0,
-            user_id: user.user_id,
-          };
-        }
+      const response = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          endpoint: '/admin/top-users',
+          method: 'GET',
+          queryParams: {
+            limit: '5',
+          },
+        }),
       });
       
-      const userResults = await Promise.all(userPromises);
+      const data = await response.json();
       
-      // Sort users by total calls (descending) and take top 5
-      const sortedUsers = userResults
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 5);
+      if (!response.ok || data.error) {
+        console.error('Error fetching top users:', data);
+        setTopUsers([]);
+        return;
+      }
       
-      setTopUsers(sortedUsers);
+      // Transform the response to match the chart format
+      const topUsersData = (data.data.top_users || []).map((user: any) => ({
+        name: user.email,
+        value: user.total_calls,
+        user_id: user.user_id,
+      }));
+      
+      setTopUsers(topUsersData);
     } catch (err: any) {
       console.error('Error fetching top users:', err);
+      setTopUsers([]);
     }
   };
 

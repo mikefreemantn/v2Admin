@@ -1,0 +1,2765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ReIntent API Admin</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+  <style>
+    :root {
+      --brand-color: #45ac48;
+      --brand-color-dark: #3a9040;
+      --brand-light: #e8f5e9;
+      --font-family: 'Inter', sans-serif;
+      --transition-speed: 0.3s;
+      --radius: 12px;
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Global Reset & Typography */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: var(--font-family);
+      background: #2c2c2c; /* Crisp charcoal gray */
+      color: #f0f0f0;
+      -webkit-font-smoothing: antialiased;
+      padding-top: 60px; /* Account for fixed header */
+    }
+
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: #1c1c1c;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      z-index: 1000;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .brand {
+      color: var(--brand-color);
+      font-size: 1.25rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .nav {
+      display: flex;
+      gap: 1.5rem;
+    }
+
+    .nav-link {
+      color: #f0f0f0;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-link:hover {
+      color: var(--brand-color);
+    }
+    a {
+      text-decoration: none;
+      color: var(--brand-color);
+      transition: color var(--transition-speed);
+    }
+    a:hover {
+      color: var(--brand-color-dark);
+    }
+    h1, h2, h3, h4, h5, h6 {
+      font-weight: 700;
+      margin-top: 0;
+    }
+    h2 { font-size: 2rem; margin-bottom: 1rem; }
+    h3 { font-size: 1.75rem; margin-bottom: 0.75rem; }
+
+    /* Login Page */
+    .login-container {
+      max-width: 400px;
+      margin: 12vh auto;
+      background: #fff;
+      padding: 2.5rem;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .login-container h2 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      color: var(--brand-color-dark);
+    }
+    .login-container .form-control {
+      border-radius: var(--radius);
+      border: 1px solid #ddd;
+      transition: border-color var(--transition-speed), box-shadow var(--transition-speed);
+    }
+    .login-container .form-control:focus {
+      border-color: var(--brand-color);
+      box-shadow: 0 0 0 3px rgba(69, 172, 72, 0.15);
+    }
+    .login-container .btn {
+      border-radius: var(--radius);
+      padding: 0.85rem;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    /* Admin Interface */
+    .admin-container {
+      display: none;
+    }
+    .admin-header {
+      background: var(--brand-color);
+      padding: 2rem 1rem;
+      color: #fff;
+      box-shadow: var(--shadow);
+      /* No rounding on the header */
+      border-radius: 0;
+    }
+    .admin-header .logo-container img {
+      height: 45px;
+    }
+    .admin-header h2 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin: 0;
+    }
+    .admin-header p {
+      font-size: 1rem;
+      opacity: 0.9;
+      margin-top: 0.5rem;
+    }
+
+    /* Main Content Area */
+    .admin-content {
+      background: #fff;
+      color: #333; /* Dark text on white background */
+      box-shadow: var(--shadow);
+      margin: 1rem 8%; /* Subtle 8% margin on each side */
+      padding: 2rem;
+    }
+
+    /* Search Box */
+    .search-box {
+      margin-bottom: 1.75rem;
+    }
+    .search-box input {
+      width: 100%;
+      padding: 0.9rem 1rem;
+      border: 1px solid #ccc;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      transition: border-color var(--transition-speed);
+    }
+    .search-box input:focus {
+      border-color: var(--brand-color);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(69, 172, 72, 0.15);
+    }
+
+    /* Table Styles */
+    .table-responsive {
+      margin-top: 1rem;
+    }
+    .user-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .user-table th,
+    .user-table td {
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid #ccc;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+    .user-table th {
+      background: var(--brand-light);
+      color: #2c3e50;
+      font-weight: 700;
+      text-align: left;
+    }
+    .user-table tr:hover {
+      background: #f8f8f8;
+    }
+
+    /* Card & Details Styles */
+    .card {
+      border: none;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 1.5rem;
+      background: #fff;
+      color: #333;
+    }
+    .card .card-body {
+      padding: 1.75rem;
+    }
+    .card-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    
+    /* Accordion Styles */
+    .accordion-item {
+      border: none;
+      border-radius: var(--radius) !important;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      margin-bottom: 1.5rem;
+    }
+    /* Chart Notes Styles */
+    .chart-note-icon {
+      position: absolute !important;
+      width: 24px !important;
+      height: 24px !important;
+      background-color: #ff5722 !important; /* Bright orange for visibility */
+      border-radius: 50% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      cursor: pointer !important;
+      z-index: 9999 !important; /* Very high z-index */
+      box-shadow: 0 0 8px rgba(255, 0, 0, 0.8) !important; /* Red glow for visibility */
+      transition: transform 0.2s !important;
+      border: 3px solid white !important;
+      pointer-events: auto !important;
+    }
+    
+    .chart-note-icon:hover {
+      transform: scale(1.3) !important;
+    }
+    
+    .chart-note-icon i {
+      color: white !important;
+      font-size: 14px !important;
+    }
+    
+    .chart-note-tooltip {
+      position: fixed;
+      background-color: #1c1c1c;
+      color: #f0f0f0;
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      max-width: 300px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+      border-left: 3px solid var(--brand-color);
+    }
+    
+    .chart-notes-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    
+    .chart-note {
+      background-color: #2c2c2c;
+      border-radius: var(--radius);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+      transition: transform 0.2s, background-color 0.2s;
+      color: #f0f0f0;
+      border-left: 3px solid var(--brand-color);
+    }
+    
+    .chart-note:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+      background-color: #383838;
+    }
+
+    .accordion-button {
+      background-color: var(--brand-light);
+      color: #2c3e50;
+      font-weight: 700;
+      padding: 0.9rem 1rem;
+      font-size: 1.25rem;
+    }
+    .accordion-button:not(.collapsed) {
+      background-color: var(--brand-light);
+      color: #2c3e50;
+      box-shadow: none;
+    }
+    .accordion-button:focus {
+      box-shadow: none;
+      border-color: transparent;
+    }
+    .accordion-button::after {
+      background-size: 1.25rem;
+      transition: all 0.2s ease;
+    }
+    .accordion-body {
+      padding: 1.75rem;
+      background-color: #fff;
+    }
+    dl { margin: 0; }
+    dt { font-weight: 700; color: #555; }
+    dd { margin: 0 0 1rem; color: #333; }
+
+    /* Modal (Edit Form) - Improved Layout, No Animation */
+    .edit-form {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90%;
+      max-width: 500px;
+      background: #fff;
+      color: #333;
+      padding: 2rem;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      z-index: 1001;
+    }
+    .edit-form h3 {
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    .edit-form hr {
+      margin: 1rem 0;
+      border: none;
+      border-top: 1px solid #ddd;
+    }
+
+    .overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+    }
+
+    /* Button Styles */
+    .btn {
+      transition: background var(--transition-speed), border-color var(--transition-speed);
+      border-radius: var(--radius);
+      letter-spacing: 0.5px;
+    }
+    .btn-primary {
+      background: var(--brand-color);
+      border: 1px solid var(--brand-color);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: var(--brand-color-dark);
+      border-color: var(--brand-color-dark);
+    }
+    .btn-outline-secondary {
+      background: transparent;
+      border: 1px solid #ccc;
+      color: #333;
+    }
+    .btn-outline-secondary:hover {
+      background: #444;
+      color: #fff;
+    }
+    .btn-outline-light {
+      background: transparent;
+      border: 1px solid #fff;
+      color: #fff;
+    }
+    .btn-outline-light:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #333;
+      color: #fff;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      display: none;
+      z-index: 1100;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <a href="/" class="brand">ReIntent API</a>
+    <nav class="nav">
+      <a href="/docs" class="nav-link">API Documentation</a>
+    </nav>
+  </header>
+
+  <!-- Login Form -->
+  <div class="login-container" id="loginContainer">
+    <h2>ReIntent API Admin</h2>
+    <div class="mb-3 text-start">
+      <label for="password" class="form-label">Password</label>
+      <input type="password" class="form-control" id="password" />
+    </div>
+    <button class="btn btn-primary w-100" onclick="login()">Login</button>
+  </div>
+
+  <!-- Admin Interface -->
+  <div class="admin-container" id="adminContainer">
+    <header class="admin-header">
+      <div class="container-fluid">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
+          <div class="d-flex align-items-center mb-2 mb-md-0">
+            <div class="logo-container me-3">
+              <img src="/logo.png" alt="ReIntent Logo" />
+            </div>
+            <h2>User Management</h2>
+          </div>
+          <button class="btn btn-outline-light" onclick="logout()">Logout</button>
+        </div>
+        <p>Manage your users, credits, and subscription plans</p>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <div id="mainContent" class="admin-content">
+      <!-- API Usage Chart Section (Accordion) -->
+      <div class="accordion mb-4" id="apiUsageAccordion">
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="apiUsageHeader">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#apiUsageCollapse" aria-expanded="true" aria-controls="apiUsageCollapse">
+              API Usage Overview
+            </button>
+          </h2>
+          <div id="apiUsageCollapse" class="accordion-collapse collapse show" aria-labelledby="apiUsageHeader" data-bs-parent="#apiUsageAccordion">
+            <div class="accordion-body">
+              <!-- Date filter controls now visible -->
+              <div class="row mb-3">
+                <div class="col-md-3">
+                  <label for="mainStartDate" class="form-label">From Date:</label>
+                  <input type="date" id="mainStartDate" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-3">
+                  <label for="mainEndDate" class="form-label">To Date:</label>
+                  <input type="date" id="mainEndDate" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                  <button class="btn btn-primary btn-sm me-2" onclick="applyMainChartDateFilter()">Apply Filter</button>
+                  <button class="btn btn-secondary btn-sm me-2" onclick="clearMainChartDateFilter()">Clear</button>
+                  <button class="btn btn-success btn-sm" onclick="showAddNoteModal('main')"><i class="bi bi-sticky"></i> Add Note</button>
+                </div>
+              </div>
+              <!-- Chart section now visible -->
+              <div id="apiUsageChartContainer" class="chart-container" style="position: relative; height:300px;">
+                <canvas id="apiUsageChart"></canvas>
+              </div>
+              <!-- Chart notes container now visible -->
+              <div id="chartNotesContainer" class="chart-notes-container mt-2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Search Box -->
+      <div class="search-box">
+        <input type="text" id="searchInput" class="form-control" placeholder="Search users by email, ID, or access key..." />
+      </div>
+      
+      <!-- Domain Usage Alert -->
+      <div id="domainAlert" class="alert alert-warning mt-3" style="display: none;">
+        <strong>Multiple Domain Usage Detected!</strong> Some users are using their API key across multiple domains.
+        <button class="btn btn-sm btn-primary ms-2" onclick="showDomainUsage()">View Details</button>
+      </div>
+
+      <!-- Users Table -->
+      <div class="table-responsive">
+        <table class="table user-table">
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Access Key</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Credits</th>
+              <th>Plan Type</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="userTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Domain Usage View -->
+    <div id="domainUsageView" class="admin-content" style="display: none;">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4">
+        <h3>Domain Usage Analysis</h3>
+        <button class="btn btn-outline-secondary" onclick="backToMain()">Back to Users</button>
+      </div>
+      
+      <div class="alert alert-info">
+        <p>This view shows users who are using their API key across multiple domains. According to your policy, each account should only be used with one publication/domain.</p>
+      </div>
+      
+      <div class="table-responsive">
+        <table class="table user-table">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Access Key</th>
+              <th>Domain Count</th>
+              <th>Domains</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="domainUsageTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- User Details Page -->
+    <div id="userDetails" class="admin-content" style="display: none;">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4">
+        <div>
+          <h3 class="mb-0">User Details</h3>
+          <div class="mt-2">
+            <button class="btn btn-sm btn-primary" onclick="editUser(document.getElementById('detailsUserId').textContent)">Edit User</button>
+            <button class="btn btn-sm btn-danger ms-2" onclick="confirmDeleteUser(document.getElementById('detailsUserId').textContent, document.getElementById('detailsEmail').textContent)">Delete User</button>
+          </div>
+        </div>
+        <button class="btn btn-outline-secondary" onclick="backToMain()">Back to Users</button>
+      </div>
+      
+      <!-- User API Usage Chart (Accordion) -->
+      <div class="accordion mb-4" id="userApiUsageAccordion">
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="userApiUsageHeader">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#userApiUsageCollapse" aria-expanded="true" aria-controls="userApiUsageCollapse">
+              API Usage Overview
+            </button>
+          </h2>
+          <div id="userApiUsageCollapse" class="accordion-collapse collapse show" aria-labelledby="userApiUsageHeader" data-bs-parent="#userApiUsageAccordion">
+            <div class="accordion-body">
+              <div class="row mb-3">
+                <div class="col-md-3">
+                  <label for="userStartDate" class="form-label">From Date:</label>
+                  <input type="date" id="userStartDate" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-3">
+                  <label for="userEndDate" class="form-label">To Date:</label>
+                  <input type="date" id="userEndDate" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                  <button class="btn btn-primary btn-sm me-2" onclick="applyUserChartDateFilter()">Apply Filter</button>
+                  <button class="btn btn-secondary btn-sm me-2" onclick="clearUserChartDateFilter()">Clear</button>
+                  <button class="btn btn-success btn-sm" onclick="showAddNoteModal('user')"><i class="bi bi-sticky"></i> Add Note</button>
+                </div>
+              </div>
+              <div id="userApiUsageChartContainer" class="chart-container" style="position: relative; height:250px;">
+                <canvas id="userApiUsageChart"></canvas>
+              </div>
+              <div id="userChartNotesContainer" class="chart-notes-container mt-2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3 mb-md-0">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">User Information</h5>
+              <dl class="row">
+                <dt class="col-sm-4">User ID</dt>
+                <dd class="col-sm-8" id="detailsUserId"></dd>
+                <dt class="col-sm-4">Access Key</dt>
+                <dd class="col-sm-8" id="detailsAccessKey"></dd>
+                <dt class="col-sm-4">Email</dt>
+                <dd class="col-sm-8" id="detailsEmail"></dd>
+                <dt class="col-sm-4">Status</dt>
+                <dd class="col-sm-8" id="detailsStatus"></dd>
+                <dt class="col-sm-4">Credits</dt>
+                <dd class="col-sm-8" id="detailsCredits"></dd>
+                <dt class="col-sm-4">Plan Type</dt>
+                <dd class="col-sm-8" id="detailsPlanType"></dd>
+                <dt class="col-sm-4">Created At</dt>
+                <dd class="col-sm-8" id="detailsCreatedAt"></dd>
+                <dt class="col-sm-4">Updated At</dt>
+                <dd class="col-sm-8" id="detailsUpdatedAt"></dd>
+                <dt class="col-sm-4">Multiple Domains</dt>
+                <dd class="col-sm-8" id="detailsAllowMultipleDomains">Not Allowed</dd>
+              </dl>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Credit History</h5>
+              <!-- Date Filter Controls -->
+              <div class="mb-3 row">
+                <div class="col-md-5">
+                  <label for="startDate" class="form-label">From Date:</label>
+                  <input type="date" id="startDate" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-5">
+                  <label for="endDate" class="form-label">To Date:</label>
+                  <input type="date" id="endDate" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                  <button class="btn btn-primary btn-sm w-100" onclick="applyDateFilter()">Filter</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Action</th>
+                      <th>Service</th>
+                      <th>Source Domain</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody id="creditHistoryBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- This section has been moved to the top of the user details page as an accordion -->
+      <!-- The original User API Usage Chart section is now removed -->
+    </div>
+  </div>
+
+  <!-- Add/Edit Note Modal -->
+  <div class="modal fade" id="addNoteModal" tabindex="-1" aria-labelledby="addNoteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="addNoteModalLabel">Add Chart Note</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="noteForm">
+            <input type="hidden" id="noteId">
+            <input type="hidden" id="noteContext" value="main">
+            <input type="hidden" id="noteUserId">
+            <div class="mb-3">
+              <label for="noteDate" class="form-label">Date</label>
+              <input type="date" class="form-control" id="noteDate" required>
+            </div>
+            <div class="mb-3">
+              <label for="noteContent" class="form-label">Note Content</label>
+              <textarea class="form-control" id="noteContent" rows="4" required></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-success" onclick="saveNote()">Save Note</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Note Details Modal -->
+  <div class="modal fade" id="noteDetailsModal" tabindex="-1" aria-labelledby="noteDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="noteDetailsModalLabel">Note Details</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <dl class="row">
+            <dt class="col-sm-3">Date</dt>
+            <dd class="col-sm-9" id="noteDetailDate"></dd>
+            <dt class="col-sm-3">Content</dt>
+            <dd class="col-sm-9" id="noteDetailContent"></dd>
+            <dt class="col-sm-3">Created</dt>
+            <dd class="col-sm-9" id="noteDetailCreatedAt"></dd>
+          </dl>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary" onclick="editNote()">Edit</button>
+          <button type="button" class="btn btn-danger" onclick="deleteNote()">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Form Modal -->
+  <div class="overlay" id="overlay"></div>
+  <div class="edit-form" id="editForm">
+    <h3>Edit User</h3>
+    <hr/>
+    <form id="userEditForm">
+      <input type="hidden" id="editUserId" />
+      <div class="mb-3">
+        <label class="form-label fw-bold">Email</label>
+        <input type="text" class="form-control" id="editEmail" disabled />
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Status</label>
+        <select class="form-control" id="editStatus">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Credits</label>
+        <input type="number" class="form-control" id="editCredits" />
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Plan Type</label>
+        <select class="form-control" id="editPlanType">
+          <option value="credit_based">Credit Based</option>
+          <option value="plan_based">Plan Based</option>
+        </select>
+      </div>
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="editAllowMultipleDomains">
+        <label class="form-check-label" for="editAllowMultipleDomains">Allow Multiple Domains</label>
+        <div class="form-text text-light">When checked, this user won't appear in the multiple domains detection list.</div>
+      </div>
+      <div class="d-flex">
+        <button type="submit" class="btn btn-primary me-2">Save Changes</button>
+        <button type="button" class="btn btn-secondary" onclick="closeEditForm()">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Admin password and API base URL
+    const ADMIN_PASSWORD = 'MakeMillion$';
+    const apiBaseUrl = 'https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1';
+    let users = [];
+    let domainUsageData = { users: [], domain_usage: {} };
+    let currentUserCreditHistory = []; // Store the current user's credit history
+    let mainApiChart = null; // Global reference to main API usage chart
+    let userApiChart = null; // Global reference to user API usage chart
+    let currentNotes = []; // Store chart notes
+
+    // On load, check for cached password and handle URL parameters
+    window.onload = async function () {
+      try {
+        // Set default date ranges (last 30 days)
+        const today = new Date();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        
+        // Format dates as YYYY-MM-DD
+        const formatDate = (date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+        
+        // Set default values for date inputs if they exist
+        const mainStartDateEl = document.getElementById('mainStartDate');
+        const mainEndDateEl = document.getElementById('mainEndDate');
+        
+        if (mainStartDateEl) mainStartDateEl.value = formatDate(thirtyDaysAgo);
+        if (mainEndDateEl) mainEndDateEl.value = formatDate(today);
+        
+        // Parse URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const userIdParam = urlParams.get('user');
+        const viewParam = urlParams.get('view');
+        
+        const cachedPassword = localStorage.getItem('adminPassword');
+        if (cachedPassword === ADMIN_PASSWORD) {
+          const loginContainer = document.getElementById('loginContainer');
+          const adminContainer = document.getElementById('adminContainer');
+          
+          if (loginContainer) loginContainer.style.display = 'none';
+          if (adminContainer) adminContainer.style.display = 'block';
+          
+          // Show loading indicator
+          console.log('Loading dashboard data...');
+          setTimeout(() => {
+            showNotification('Loading dashboard data...', 'info');
+          }, 100);
+          
+          // Use setTimeout to allow the UI to render before starting heavy operations
+          setTimeout(async () => {
+            try {
+              // First load users (needed for any view)
+              await loadUsers();
+              
+              // Then navigate to the appropriate view based on URL parameters
+              if (userIdParam) {
+                console.log('URL contains user ID:', userIdParam);
+                await showUserDetails(userIdParam, false); // Don't push state again
+              } else if (viewParam === 'domains') {
+                console.log('URL indicates domain usage view');
+                showDomainUsage(false); // Don't push state again
+              } else {
+                // Default to home view
+                showHome(false);
+                
+                // Load API usage chart in the background after the UI is displayed
+                setTimeout(() => {
+                  renderMainApiUsageChart();
+                }, 500);
+              }
+            } catch (error) {
+              console.error('Error during initialization:', error);
+              showNotification('Error loading dashboard: ' + error.message, 'error');
+            }
+          }, 200);
+        }
+        
+        // Set up browser history navigation handling
+        window.addEventListener('popstate', handlePopState);
+      } catch (error) {
+        console.error('Critical error during page initialization:', error);
+        alert('Error initializing admin dashboard: ' + error.message);
+      }
+    };
+    
+    // Handle browser back/forward navigation
+    function handlePopState(event) {
+      console.log('Navigation event:', event);
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get('user');
+      const view = urlParams.get('view');
+      
+      if (userId) {
+        showUserDetails(userId, false); // Don't push state again
+      } else if (view === 'domains') {
+        showDomainUsage(false); // Don't push state again
+      } else {
+        showHome(false); // Don't push state again
+      }
+    };
+
+    // Logout
+    function logout() {
+      localStorage.removeItem('adminPassword');
+      document.getElementById('loginContainer').style.display = 'block';
+      document.getElementById('adminContainer').style.display = 'none';
+      document.getElementById('password').value = '';
+    }
+
+    // Login
+    function login() {
+      const password = document.getElementById('password').value;
+      if (password === ADMIN_PASSWORD) {
+        localStorage.setItem('adminPassword', password);
+        document.getElementById('loginContainer').style.display = 'none';
+        document.getElementById('adminContainer').style.display = 'block';
+        loadUsers();
+      } else {
+        alert('Invalid password');
+      }
+    }
+
+    // Load users from API
+    async function loadUsers() {
+      try {
+        // Show loading indicator in the users table
+        const userTableBody = document.getElementById('userTableBody');
+        if (userTableBody) {
+          userTableBody.innerHTML = `
+            <tr>
+              <td colspan="7" class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading users...</p>
+              </td>
+            </tr>
+          `;
+        } else {
+          console.warn('userTableBody element not found');
+        }
+        
+        // Since we're having CORS issues with the API, let's use a different approach
+        // Instead of using the x-api-key in the header which triggers a preflight request,
+        // let's add it as a query parameter which doesn't require preflight
+        const apiUrl = 'https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1/admin/users?key=ri_5437c19aa7de';
+        console.log('API URL:', apiUrl);
+        
+        // Make the request without the custom header to avoid preflight
+        console.log('Making fetch request without custom headers...');
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          },
+          mode: 'cors'
+        });
+        
+        console.log('Response status:', response.status);
+        console.log('Response headers:', [...response.headers.entries()]);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Error response body:', errorText);
+          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('API Response:', data); // Debug log
+        
+        // Check if the response has users directly or in a body property
+        if (data.users) {
+          users = data.users;
+          // Extract domain usage data if available
+          if (data.domain_usage) {
+            domainUsageData = data.domain_usage;
+          }
+        } else if (data.body && typeof data.body === 'string') {
+          // If the response has a body property that's a string, parse it
+          try {
+            const parsedBody = JSON.parse(data.body);
+            if (parsedBody.users) {
+              users = parsedBody.users;
+              // Extract domain usage data if available
+              if (parsedBody.domain_usage) {
+                domainUsageData = parsedBody.domain_usage;
+              }
+            } else {
+              throw new Error('No users data in response body');
+            }
+          } catch (parseError) {
+            throw new Error(`Error parsing response body: ${parseError.message}`);
+          }
+        } else {
+          throw new Error('No users data in response');
+        }
+        
+        // Display users immediately
+        displayUsers(users);
+        
+        // After loading users, check domain usage
+        checkDomainUsage();
+        
+        // Don't automatically load the API usage chart - it will be loaded separately
+        // This improves initial page load performance
+      } catch (error) {
+        console.error('Error loading users:', error);
+        showNotification(`Error loading users: ${error.message}`, 'error');
+        const userTableBody = document.getElementById('userTableBody');
+        if (userTableBody) {
+          userTableBody.innerHTML = `
+            <tr>
+              <td colspan="7" class="text-center text-danger">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                Failed to load users: ${error.message}
+              </td>
+            </tr>
+          `;
+        }
+      }
+    }
+    
+    // Check domain usage from the enhanced user data
+    function checkDomainUsage() {
+      try {
+        if (!domainUsageData || !domainUsageData.users) return;
+        
+        // Show alert only if there are non-whitelisted users with multiple domains
+        const nonWhitelistedMultiDomainUsers = domainUsageData.users.filter(user => 
+          user.domain_count > 1 && !user.allow_multiple_domains
+        );
+        
+        if (nonWhitelistedMultiDomainUsers.length > 0) {
+          document.getElementById('domainAlert').style.display = 'block';
+        } else {
+          document.getElementById('domainAlert').style.display = 'none';
+        }
+      } catch (error) {
+        console.error('Error checking domain usage:', error);
+      }
+    }
+
+    // Display users in table
+    function displayUsers(usersToDisplay) {
+      const tbody = document.getElementById('userTableBody');
+      tbody.innerHTML = '';
+      usersToDisplay.forEach(user => {
+        // Check if this user has multiple domains and is not whitelisted
+        let multiDomainUser = false;
+        if (domainUsageData && domainUsageData.users) {
+          const userDomainInfo = domainUsageData.users.find(u => u.user_id === user.user_id);
+          if (userDomainInfo && userDomainInfo.domain_count > 1 && !userDomainInfo.allow_multiple_domains) {
+            multiDomainUser = true;
+          }
+        }
+        
+        const tr = document.createElement('tr');
+        if (multiDomainUser) {
+          tr.classList.add('table-warning');
+        }
+        
+        tr.innerHTML = `
+          <td><a href="?user=${user.user_id}" onclick="showUserDetails('${user.user_id}'); return false;">${user.user_id}</a></td>
+          <td>${user.access_key || 'N/A'}</td>
+          <td>${user.email} ${multiDomainUser ? '<span class="badge bg-warning text-dark" title="Multiple domains detected">⚠️</span>' : ''}</td>
+          <td>${user.status}</td>
+          <td>${user.credits}</td>
+          <td>${user.plan_type}</td>
+          <td>
+            <button class="btn btn-primary btn-sm" onclick="editUser('${user.user_id}')">Edit</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Delete user confirmation
+    function confirmDeleteUser(userId, email) {
+      // Create a custom confirmation dialog
+      const confirmationDiv = document.createElement('div');
+      confirmationDiv.className = 'card mt-3 mb-3 border-danger';
+      confirmationDiv.id = 'deleteConfirmationCard';
+      confirmationDiv.innerHTML = `
+        <div class="card-header bg-danger text-white">
+          <h5>Confirm User Deletion</h5>
+        </div>
+        <div class="card-body">
+          <p>You are about to permanently delete the following user and all their data:</p>
+          <div class="alert alert-warning">
+            <strong>User ID:</strong> ${userId}<br>
+            <strong>Email:</strong> ${email}
+          </div>
+          <p class="mt-3">This action <strong>cannot be undone</strong>. To confirm, please type <strong>DELETE</strong> below:</p>
+          <input type="text" id="deleteConfirmText" class="form-control" placeholder="Type DELETE to confirm">
+          <div class="mt-3 d-flex justify-content-end">
+            <button class="btn btn-secondary me-2" onclick="cancelDelete()">Cancel</button>
+            <button class="btn btn-danger" id="confirmDeleteBtn" disabled onclick="proceedWithDelete('${userId}')">Delete User</button>
+          </div>
+        </div>
+      `;
+      
+      // Insert the confirmation dialog after the user details card
+      const userInfoCard = document.querySelector('#userDetails .card');
+      userInfoCard.parentNode.insertBefore(confirmationDiv, userInfoCard.nextSibling);
+      
+      // Add event listener to the confirmation input
+      document.getElementById('deleteConfirmText').addEventListener('input', function() {
+        document.getElementById('confirmDeleteBtn').disabled = this.value !== 'DELETE';
+      });
+    }
+    
+    // Cancel delete operation
+    function cancelDelete() {
+      const confirmationCard = document.getElementById('deleteConfirmationCard');
+      if (confirmationCard) {
+        confirmationCard.remove();
+      }
+    }
+    
+    // Proceed with deletion after confirmation
+    function proceedWithDelete(userId) {
+      const confirmationCard = document.getElementById('deleteConfirmationCard');
+      if (confirmationCard) {
+        confirmationCard.remove();
+      }
+      deleteUser(userId);
+    }
+    
+    // Delete user
+    async function deleteUser(userId) {
+      try {
+        const response = await fetch(`${apiBaseUrl}/admin/users/${userId}/delete?key=ri_5437c19aa7de`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors'
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        alert(`User deleted successfully. ${data.deleted_history_count} credit history records were also removed.`);
+        
+        // Reload the user list
+        loadUsers();
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        alert(`Error deleting user: ${error.message}. Check browser console for details.`);
+      }
+    }
+    
+    // Show user details
+    async function showUserDetails(userId, updateHistory = true) {
+      console.log('Showing user details for:', userId);
+      const user = users.find(u => u.user_id === userId);
+      if (!user) {
+        console.error('User not found:', userId);
+        return;
+      }
+      document.getElementById('mainContent').style.display = 'none';
+      document.getElementById('userDetails').style.display = 'block';
+      document.getElementById('domainUsageView').style.display = 'none';
+      
+      // Update browser URL and history if requested
+      if (updateHistory) {
+        const baseUrl = window.location.href.split('?')[0];
+        window.history.pushState(
+          {page: 'user', userId: userId}, 
+          `ReIntent API Admin - User ${userId}`, 
+          `${baseUrl}?user=${userId}`
+        );
+      }
+
+      document.getElementById('detailsUserId').textContent = user.user_id;
+      document.getElementById('detailsAccessKey').textContent = user.access_key || 'N/A';
+      document.getElementById('detailsEmail').textContent = user.email;
+      document.getElementById('detailsStatus').textContent = user.status;
+      document.getElementById('detailsCredits').textContent = user.credits;
+      document.getElementById('detailsPlanType').textContent = user.plan_type;
+      document.getElementById('detailsCreatedAt').textContent = new Date(user.created_at * 1000).toLocaleString('en-US', { timeZone: 'America/Chicago' });
+      document.getElementById('detailsUpdatedAt').textContent = new Date(user.updated_at * 1000).toLocaleString('en-US', { timeZone: 'America/Chicago' });
+      document.getElementById('detailsAllowMultipleDomains').textContent = user.allow_multiple_domains ? 'Allowed' : 'Not Allowed';
+
+      // Set default date filters (last 30 days)
+      const today = new Date();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      
+      // Format dates as YYYY-MM-DD
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      // Set default values for date inputs
+      document.getElementById('startDate').value = formatDate(thirtyDaysAgo);
+      document.getElementById('endDate').value = formatDate(today);
+      document.getElementById('userStartDate').value = formatDate(thirtyDaysAgo);
+      document.getElementById('userEndDate').value = formatDate(today);
+
+      // Load credit history
+      try {
+        const creditHistoryUrl = 'https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1/admin/users/' + userId + '/credit-history?key=ri_5437c19aa7de';
+        const response = await fetch(creditHistoryUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        const data = await response.json();
+        const historyBody = document.getElementById('creditHistoryBody');
+        historyBody.innerHTML = '';
+        if (!data.history || data.history.length === 0) {
+          historyBody.innerHTML = '<tr><td colspan="5" class="text-center">No credit history available</td></tr>';
+          return;
+        }
+        
+        // Store the full credit history for filtering
+        currentUserCreditHistory = data.history.map(item => ({
+          ...item,
+          dateObj: new Date(item.date) // Pre-compute date object for filtering
+        }));
+        
+        // Display all history items initially
+        displayCreditHistory(currentUserCreditHistory);
+        
+        // Load the user-specific API usage chart
+        renderUserApiUsageChart(userId);
+      } catch (error) {
+        console.error('Error loading credit history:', error);
+      }
+    }
+
+    // Back to main page (renamed to showHome for clarity)
+    function showHome(updateHistory = true) {
+      document.getElementById('mainContent').style.display = 'block';
+      document.getElementById('userDetails').style.display = 'none';
+      document.getElementById('domainUsageView').style.display = 'none';
+      // Clear the current user credit history
+      currentUserCreditHistory = [];
+      
+      // Update browser URL and history if requested
+      if (updateHistory) {
+        const baseUrl = window.location.href.split('?')[0];
+        window.history.pushState({page: 'home'}, 'ReIntent API Admin - Home', baseUrl);
+      }
+      
+      // Refresh the main API usage chart
+      renderMainApiUsageChart();
+    }
+    
+    // Keep backToMain as an alias to showHome for backward compatibility
+    function backToMain() {
+      showHome();
+    }
+    
+    // Show domain usage view
+    function showDomainUsage(updateHistory = true) {
+      document.getElementById('mainContent').style.display = 'none';
+      document.getElementById('userDetails').style.display = 'none';
+      document.getElementById('domainUsageView').style.display = 'block';
+      
+      // Update browser URL and history if requested
+      if (updateHistory) {
+        const baseUrl = window.location.href.split('?')[0];
+        window.history.pushState(
+          {page: 'domains'}, 
+          'ReIntent API Admin - Domain Usage', 
+          `${baseUrl}?view=domains`
+        );
+      }
+      
+      const tbody = document.getElementById('domainUsageTableBody');
+      tbody.innerHTML = '';
+      
+      // Only show users with multiple domains who are not whitelisted
+      const multiDomainUsers = domainUsageData.users.filter(user => 
+        user.domain_count > 1 && !user.allow_multiple_domains
+      );
+      
+      multiDomainUsers.forEach(user => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${user.email}</td>
+          <td>${user.access_key}</td>
+          <td><span class="badge bg-danger">${user.domain_count}</span></td>
+          <td>${user.domains.join('<br>')}</td>
+          <td>${user.status}</td>
+          <td><button class="btn btn-primary btn-sm" onclick="showUserDetails('${user.user_id}')">View User</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+    
+    // Display credit history items
+    function displayCreditHistory(historyItems) {
+      const historyBody = document.getElementById('creditHistoryBody');
+      historyBody.innerHTML = '';
+      
+      if (historyItems.length === 0) {
+        historyBody.innerHTML = '<tr><td colspan="5" class="text-center">No credit history available for the selected date range</td></tr>';
+        return;
+      }
+      
+      historyItems.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${item.dateObj.toLocaleString('en-US', { timeZone: 'America/Chicago' })}</td>
+          <td>${item.action_type}</td>
+          <td>${item.service}</td>
+          <td>${item.source_domain || 'N/A'}</td>
+          <td>${item.amount}</td>
+        `;
+        historyBody.appendChild(row);
+      });
+    }
+    
+    // Apply date filter to credit history
+    function applyDateFilter() {
+      const startDateInput = document.getElementById('startDate').value;
+      const endDateInput = document.getElementById('endDate').value;
+      
+      let filteredHistory = [...currentUserCreditHistory];
+      
+      if (startDateInput) {
+        const startDate = new Date(startDateInput);
+        startDate.setHours(0, 0, 0, 0);
+        filteredHistory = filteredHistory.filter(item => item.dateObj >= startDate);
+      }
+      
+      if (endDateInput) {
+        const endDate = new Date(endDateInput);
+        endDate.setHours(23, 59, 59, 999);
+        filteredHistory = filteredHistory.filter(item => item.dateObj <= endDate);
+      }
+      
+      displayCreditHistory(filteredHistory);
+    }
+    
+    // Load API usage data from the API
+    async function loadApiUsageData(startDate = null, endDate = null) {
+      console.log('Loading API usage data...');
+      
+      try {
+        // Build the API URL with the correct endpoint and parameters
+        let apiUrl = `https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1/admin/api-usage`;
+        
+        // Add the API key as a query parameter to avoid CORS preflight
+        apiUrl += `?key=ri_5437c19aa7de`;
+        
+        if (startDate) apiUrl += `&start_date=${startDate}`;
+        if (endDate) apiUrl += `&end_date=${endDate}`;
+        console.log('Using API URL:', apiUrl);
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('API usage data response:', data);
+        
+        // Check for different response formats
+        let processedData = {};
+        
+        if (data.usage_data) {
+          // Standard format
+          processedData = data.usage_data;
+        } else if (data.api_usage && Array.isArray(data.api_usage)) {
+          // Alternative format
+          processedData = {
+            overall: data.api_usage,
+            total_requests: data.api_usage.reduce((sum, item) => sum + item.count, 0)
+          };
+        } else if (Array.isArray(data)) {
+          // Direct array format
+          processedData = {
+            overall: data,
+            total_requests: data.reduce((sum, item) => sum + item.count, 0)
+          };
+        } else if (data.data && Array.isArray(data.data)) {
+          // Nested data format
+          processedData = {
+            overall: data.data,
+            total_requests: data.data.reduce((sum, item) => sum + item.count, 0)
+          };
+        } else {
+          throw new Error('Unexpected data format from API');
+        }
+        
+        // Return the data with defaults for missing properties
+        return {
+          overall: processedData.overall || [],
+          by_user: processedData.by_user || {},
+          by_service: processedData.by_service || {},
+          by_date: processedData.by_date || {},
+          by_user_date: processedData.by_user_date || {},
+          total_requests: processedData.total_requests || 0,
+          date_range: processedData.date_range || { start: null, end: null },
+          user_stats: processedData.user_stats || [],
+          notes: data.notes || [],
+          user_id: typeof currentUserId !== 'undefined' ? currentUserId : null
+        };
+      } catch (error) {
+        console.error('Error loading API usage data:', error);
+        showNotification(`Error loading API usage data: ${error.message}`, 'error');
+        throw error; // Re-throw to handle in the calling function
+      }
+    }
+    
+    // Function to generate mock API usage data for testing
+    function getMockApiUsageData() {
+      const today = new Date();
+      const mockData = {
+        overall: [],
+        by_user: {},
+        by_service: {},
+        by_date: {},
+        by_user_date: {},
+        total_requests: 0,
+        date_range: { 
+          start: new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+          end: today.toISOString().split('T')[0] 
+        },
+        user_stats: [],
+        notes: []
+      };
+      
+      // Generate some mock data points for the last 30 days
+      for (let i = 0; i < 30; i++) {
+        const date = new Date(today.getTime() - (30 - i) * 24 * 60 * 60 * 1000);
+        const dateStr = date.toISOString().split('T')[0];
+        const count = Math.floor(Math.random() * 50) + 10; // Random count between 10-60
+        
+        mockData.overall.push({
+          date: dateStr,
+          count: count
+        });
+        
+        mockData.total_requests += count;
+      }
+      
+      return mockData;
+    }
+    
+    // Load API usage data for a specific user
+    async function loadUserApiUsageData(userId, startDate = null, endDate = null) {
+      try {
+        console.log('Loading API usage data for user:', userId);
+        // Use the v1 endpoint which has CORS enabled for S3 sites
+        // Add the API key as a query parameter to avoid CORS preflight
+        let url = `https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1/admin/api-usage?key=ri_5437c19aa7de&user_id=${userId}`;
+        console.log('Using user-specific API URL:', url);
+        if (startDate || endDate) {
+          if (startDate) url += `&start_date=${startDate}`;
+          if (endDate) url += `&end_date=${endDate}`;
+        }
+        
+        // Use simple headers that don't trigger preflight
+        const userApiHeaders = {
+          'Accept': 'application/json'
+        };
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: userApiHeaders,
+          mode: 'cors'
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Check if we have user-specific data
+        if (data.api_usage && Array.isArray(data.api_usage)) {
+          console.log(`Received ${data.api_usage.length} API usage records for user ${userId}`);
+          return data.api_usage;
+        } else if (data.data && Array.isArray(data.data)) {
+          // Alternative data format
+          console.log(`Received ${data.data.length} API usage records for user ${userId}`);
+          return data.data;
+        } else if (Array.isArray(data)) {
+          // Direct array format
+          console.log(`Received ${data.length} API usage records for user ${userId}`);
+          return data;
+        } else {
+          console.warn('Unexpected data format for user API usage:', data);
+          return [];
+        }
+      } catch (error) {
+        console.error('Error loading user API usage data:', error);
+        return [];
+      }
+    }
+    
+    // Render the main API usage chart
+    async function renderMainApiUsageChart(startDate = null, endDate = null) {
+      console.log('Rendering main API usage chart...');
+      
+      // Get the chart container
+      const chartContainer = document.getElementById('apiUsageChartContainer');
+      if (!chartContainer) {
+        console.warn('Chart container not found, skipping chart rendering');
+        return;
+      }
+      
+      // Show loading indicator
+      chartContainer.innerHTML = `
+        <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
+          <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading API usage data...</p>
+          </div>
+        </div>
+      `;
+      
+      try {
+        // Load chart notes and API usage data in parallel
+        const notesPromise = loadChartNotes('main', startDate, endDate);
+        
+        // Get the API usage data
+        let apiUsageData;
+        try {
+          apiUsageData = await loadApiUsageData(startDate, endDate);
+          console.log('API usage data for chart:', apiUsageData);
+        } catch (error) {
+          chartContainer.innerHTML = `
+            <div class="alert alert-danger">
+              <h4>Error Loading Data</h4>
+              <p>Failed to load API usage data: ${error.message}</p>
+            </div>
+          `;
+          return;
+        }
+        
+        // Restore the chart canvas
+        chartContainer.innerHTML = '<canvas id="apiUsageChart" width="100%" height="400"></canvas>';
+        const chartElement = document.getElementById('apiUsageChart');
+        if (!chartElement) {
+          console.error('Failed to create chart canvas element');
+          chartContainer.innerHTML = '<div class="alert alert-danger">Error creating chart</div>';
+          return;
+        }
+        const ctx = chartElement.getContext('2d');
+        
+        // Check if we have valid data for the chart
+        if (!apiUsageData.overall || !Array.isArray(apiUsageData.overall)) {
+          chartContainer.innerHTML = `
+            <div class="alert alert-warning">
+              <h4>No Data Available</h4>
+              <p>No API usage data is available for the selected period.</p>
+            </div>
+          `;
+          return;
+        }
+        
+        // Process the data for the chart
+        const labels = apiUsageData.overall.map(item => item.date);
+        const data = apiUsageData.overall.map(item => item.count);
+        
+        // Extract service-specific data
+        const totalCounts = apiUsageData.overall.map(item => item.count);
+        const chatgptCounts = apiUsageData.overall.map(item => item.by_service?.chatgpt || 0);
+        const firecrawlCounts = apiUsageData.overall.map(item => item.by_service?.firecrawl || 0);
+        const dalleCounts = apiUsageData.overall.map(item => item.by_service?.dalle || 0);
+        const pexelsCounts = apiUsageData.overall.map(item => item.by_service?.pexels || 0);
+        
+        // Destroy existing chart if it exists
+        if (mainApiChart) {
+          mainApiChart.destroy();
+        }
+      
+        // Find notes that match dates in the chart
+        const notesForChart = [];
+        // Ensure currentNotes is initialized
+        if (typeof currentNotes === 'undefined') {
+          console.warn('currentNotes is undefined, initializing to empty array');
+          currentNotes = [];
+        }
+        if (currentNotes && currentNotes.length > 0) {
+          currentNotes.forEach(note => {
+            const noteDate = formatDate(new Date(note.date));
+            const dateIndex = labels.findIndex(d => d === noteDate);
+            
+            // If we found a matching date in our chart data
+            if (dateIndex !== -1) {
+              notesForChart.push({
+                index: dateIndex,
+                note: note,
+                value: totalCounts[dateIndex] // Position at the data point's y-value
+              });
+            }
+          });
+        }
+      
+        // Create a new dataset just for note markers
+        const noteMarkers = {
+          label: 'Notes',
+          data: labels.map((date, index) => {
+            // Check if there's a note for this date
+            const hasNote = notesForChart.some(n => n.index === index);
+            return hasNote ? totalCounts[index] : null; // Only show points where notes exist
+          }),
+          backgroundColor: 'var(--brand-color)',
+          borderColor: '#ffffff',
+          borderWidth: 2,
+          pointRadius: 8,
+          pointHoverRadius: 10,
+          pointStyle: 'circle',
+          showLine: false,
+          fill: false
+        };
+        
+        mainApiChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels, // Use labels instead of dates
+            datasets: [
+              {
+                label: 'Total API Calls',
+                data: totalCounts,
+                borderColor: '#45ac48',
+                backgroundColor: 'rgba(69, 172, 72, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+              },
+              {
+                label: 'ChatGPT',
+                data: chatgptCounts,
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4
+              },
+              {
+                label: 'Firecrawl',
+                data: firecrawlCounts,
+                borderColor: '#e74c3c',
+                backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4
+              },
+              {
+                label: 'DALL-E',
+                data: dalleCounts,
+                borderColor: '#9b59b6',
+                backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4
+              },
+              {
+                label: 'Pexels',
+                data: pexelsCounts,
+                borderColor: '#2ecc71',
+                backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4
+              },
+              noteMarkers // Add the note markers as a separate dataset
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  // Customize the tooltip to show the breakdown or note content
+                  label: function(context) {
+                    const dataIndex = context.dataIndex;
+                    const datasetIndex = context.datasetIndex;
+                    
+                    // If this is the notes dataset
+                    if (datasetIndex === 3) {
+                      // Find the note for this date
+                      const noteForThisDate = notesForChart.find(n => n.index === dataIndex);
+                      if (noteForThisDate) {
+                        return [`Note: ${noteForThisDate.note.content}`];
+                      }
+                      return ['Note'];
+                    }
+                    // If this is the first dataset (Total API Calls)
+                    else if (datasetIndex === 0) {
+                      const item = apiUsageData[dataIndex];
+                      const chatgpt = item.by_service.chatgpt || 0;
+                      const firecrawl = item.by_service.firecrawl || 0;
+                      
+                      return [
+                        `API Calls: ${item.count}`,
+                        `ChatGPT: ${chatgpt}`,
+                        `Firecrawl: ${firecrawl}`
+                      ];
+                    } else {
+                      // For individual service datasets
+                      return `${context.dataset.label}: ${context.raw}`;
+                    }
+                  }
+                }
+              },
+              legend: {
+                onClick: function(e, legendItem, legend) {
+                  // Don't allow toggling off the Notes dataset
+                  if (legendItem.datasetIndex === 3) {
+                    return;
+                  }
+                  
+                  // Default legend click behavior for other datasets
+                  Chart.defaults.plugins.legend.onClick(e, legendItem, legend);
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: 'Number of API Calls'
+                }
+              },
+              x: {
+                title: {
+                  display: true,
+                  text: 'Date'
+                }
+              }
+            },
+            onClick: function(event, elements) {
+              // When clicking on a note marker, show the note details
+              if (elements.length > 0) {
+                const element = elements[0];
+                if (element.datasetIndex === 3) { // Notes dataset
+                  const noteIndex = element.index;
+                  const noteForThisDate = notesForChart.find(n => n.index === noteIndex);
+                  if (noteForThisDate) {
+                    showNoteDetails(noteForThisDate.note.id);
+                  }
+                }
+              }
+            }
+          }
+        });
+        
+        // Wait for notes to be loaded
+        await notesPromise;
+        
+        // Add note markers to the chart after it's created
+        addNoteMarkersToChart('main');
+      } catch (error) {
+        console.error('Error rendering main API usage chart:', error);
+        const chartContainer = document.getElementById('apiUsageChartContainer');
+        chartContainer.innerHTML = `
+          <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            Error loading API usage chart: ${error.message}
+          </div>
+        `;
+      }
+    }
+    
+    // Render the user-specific API usage chart
+    async function renderUserApiUsageChart(userId, startDate = null, endDate = null) {
+      if (!userId) {
+        console.error('No user ID provided for user API usage chart');
+        return;
+      }
+      
+      console.log(`Rendering API usage chart for user: ${userId}`);
+      
+      // Get the chart container
+      const chartContainer = document.getElementById('userApiUsageChartContainer');
+      if (!chartContainer) {
+        console.warn('User chart container not found, skipping chart rendering');
+        return;
+      }
+      
+      // Show loading indicator
+      chartContainer.innerHTML = `
+        <div class="d-flex justify-content-center align-items-center" style="height: 250px;">
+          <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading user API usage data...</p>
+          </div>
+        </div>
+      `;
+      
+      try {
+        // If no dates provided, they'll default to last 30 days on the server
+        console.log(`Loading API usage data specifically for user: ${userId}`);
+        const apiUsageData = await loadUserApiUsageData(userId, startDate, endDate);
+        
+        if (!apiUsageData || apiUsageData.length === 0) {
+          console.warn(`No API usage data found for user: ${userId}`);
+          chartContainer.innerHTML = 
+            '<div class="alert alert-info">No API usage data available for this user.</div>';
+          return;
+        }
+        
+        console.log(`Received ${apiUsageData.length} API usage records for user ${userId}:`, apiUsageData);
+        
+        // Restore canvas if it was replaced
+        chartContainer.innerHTML = '<canvas id="userApiUsageChart"></canvas>';
+        
+        // Set the current user ID in a data attribute for reference
+        chartContainer.dataset.userId = userId;
+        
+        // Load user-specific notes in parallel - ensure userId is passed
+        console.log('Loading user-specific notes for userId:', userId);
+        const notesPromise = loadChartNotes('user', startDate, endDate, userId);
+      
+        // Process the data for the chart
+        const labels = apiUsageData.map(item => item.date);
+        const counts = apiUsageData.map(item => item.count);
+        
+        // Extract service-specific data if available
+        const chatgptCounts = apiUsageData.map(item => item.by_service?.chatgpt || 0);
+        const firecrawlCounts = apiUsageData.map(item => item.by_service?.firecrawl || 0);
+        const dalleCounts = apiUsageData.map(item => item.by_service?.dalle || 0);
+        const pexelsCounts = apiUsageData.map(item => item.by_service?.pexels || 0);
+        
+        console.log('Chart data prepared:', { labels, counts });
+        
+        // Get the canvas context
+        const canvas = document.getElementById('userApiUsageChart');
+        if (!canvas) {
+          console.error('User API usage chart canvas not found');
+          return;
+        }
+        const ctx = canvas.getContext('2d');
+        
+        // Destroy existing chart if it exists
+        if (userApiChart) {
+          userApiChart.destroy();
+        }
+        
+        userApiChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Total API Calls',
+                data: counts,
+                borderColor: '#45ac48',
+                backgroundColor: 'rgba(69, 172, 72, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+              },
+              {
+                label: 'ChatGPT',
+                data: chatgptCounts,
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4
+              },
+              {
+                label: 'Firecrawl',
+                data: firecrawlCounts,
+                borderColor: '#e74c3c',
+                backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4
+              },
+              {
+                label: 'DALL-E',
+                data: dalleCounts,
+                borderColor: '#9b59b6',
+                backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4
+              },
+              {
+                label: 'Pexels',
+                data: pexelsCounts,
+                borderColor: '#2ecc71',
+                backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return `API Calls: ${context.raw}`;
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: 'Number of API Calls'
+                }
+              },
+              x: {
+                title: {
+                  display: true,
+                  text: 'Date'
+                }
+              }
+            }
+          }
+        });
+        
+        // Wait for notes to be loaded
+        await notesPromise;
+        
+        // Add note markers to the chart after it's created
+        addNoteMarkersToChart('user');
+      } catch (error) {
+        console.error('Error rendering user API usage chart:', error);
+        const chartContainer = document.getElementById('userApiUsageChartContainer');
+        if (chartContainer) {
+          chartContainer.innerHTML = `
+            <div class="alert alert-danger">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>
+              Error loading user API usage chart: ${error.message}
+            </div>
+          `;
+        }
+      }
+    }
+    
+    // Apply date filter to main chart
+    function applyMainChartDateFilter() {
+      const startDate = document.getElementById('mainStartDate').value;
+      const endDate = document.getElementById('mainEndDate').value;
+      renderMainApiUsageChart(startDate || null, endDate || null);
+    }
+    
+    // Clear date filter for main chart
+    function clearMainChartDateFilter() {
+      document.getElementById('mainStartDate').value = '';
+      document.getElementById('mainEndDate').value = '';
+      renderMainApiUsageChart(null, null);
+    }
+    
+    // Apply date filter to user chart
+    function applyUserChartDateFilter() {
+      const userId = document.getElementById('detailsUserId').textContent;
+      const startDate = document.getElementById('userStartDate').value;
+      const endDate = document.getElementById('userEndDate').value;
+      renderUserApiUsageChart(userId, startDate || null, endDate || null);
+    }
+    
+    // Clear date filter for user chart
+    function clearUserChartDateFilter() {
+      document.getElementById('userStartDate').value = '';
+      document.getElementById('userEndDate').value = '';
+      const userId = document.getElementById('detailsUserId').textContent;
+      renderUserApiUsageChart(userId, null, null);
+    }
+
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      const searchTerm = e.target.value.toLowerCase();
+      const filteredUsers = users.filter(user =>
+        user.email.toLowerCase().includes(searchTerm) ||
+        user.user_id.toLowerCase().includes(searchTerm) ||
+        (user.access_key && user.access_key.toLowerCase().includes(searchTerm))
+      );
+      displayUsers(filteredUsers);
+    });
+
+    // Edit user
+    function editUser(userId) {
+      const user = users.find(u => u.user_id === userId);
+      if (user) {
+        document.getElementById('editUserId').value = user.user_id;
+        document.getElementById('editEmail').value = user.email;
+        document.getElementById('editStatus').value = user.status;
+        document.getElementById('editCredits').value = user.credits;
+        document.getElementById('editPlanType').value = user.plan_type;
+        document.getElementById('editAllowMultipleDomains').checked = user.allow_multiple_domains || false;
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('editForm').style.display = 'block';
+      }
+    }
+
+    // Close edit form
+    function closeEditForm() {
+      document.getElementById('overlay').style.display = 'none';
+      document.getElementById('editForm').style.display = 'none';
+    }
+
+    // Save user changes
+    document.getElementById('userEditForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userId = document.getElementById('editUserId').value;
+      const credits = parseInt(document.getElementById('editCredits').value);
+      if (isNaN(credits) || credits < 0) {
+        alert('Credits must be a non-negative number');
+        return;
+      }
+      const updates = {
+        status: document.getElementById('editStatus').value,
+        credits: credits,
+        plan_type: document.getElementById('editPlanType').value,
+        allow_multiple_domains: document.getElementById('editAllowMultipleDomains').checked
+      };
+
+      try {
+        const apiUrl = `https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1/admin/users/${userId}?key=ri_5437c19aa7de`;
+        
+        // Skip preflight since we're using query parameter for authentication
+        
+        // Update
+        const response = await fetch(apiUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          mode: 'cors',
+          body: JSON.stringify(updates),
+        });
+        const responseText = await response.text();
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}, body: ${responseText}`);
+        }
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          throw new Error('Invalid JSON response from server');
+        }
+        if (data.error) throw new Error(data.error);
+
+        // Show toast
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = 'Changes saved successfully';
+        document.body.appendChild(toast);
+        toast.style.display = 'block';
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(100px)';
+          setTimeout(() => {
+            document.body.removeChild(toast);
+          }, 300);
+        }, 3000);
+
+        closeEditForm();
+        loadUsers();
+      } catch (error) {
+        console.error('Error updating user:', error);
+        alert(`Error updating user: ${error.message}`);
+      }
+    });
+  
+  // Chart Notes Functions
+  // currentNotes is already declared globally
+  let currentNoteId = null;
+  // Use the same apiBaseUrl for all API calls for consistency
+  const API_ENDPOINT = apiBaseUrl;
+  
+  // Function to show notifications
+  function showNotification(message, type = 'info') {
+    try {
+      // First check if the container exists, if not create it
+      let notificationContainer = document.getElementById('notificationContainer');
+      if (!notificationContainer) {
+        notificationContainer = createNotificationContainer();
+      }
+      
+      // Create the notification element
+      const notification = document.createElement('div');
+      notification.className = `alert alert-${type} alert-dismissible fade show`;
+      notification.role = 'alert';
+      notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      `;
+      
+      // Add the notification to the container
+      notificationContainer.appendChild(notification);
+      
+      // Auto-dismiss after 5 seconds
+      setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => {
+          try {
+            notification.remove();
+          } catch (e) {
+            console.warn('Could not remove notification:', e);
+          }
+        }, 300);
+      }, 5000);
+    } catch (error) {
+      // Fallback to console if the notification system fails
+      console.warn('Failed to show notification:', message, error);
+    }
+  }
+  
+  // Create notification container if it doesn't exist
+  function createNotificationContainer() {
+    const container = document.createElement('div');
+    container.id = 'notificationContainer';
+    container.style.position = 'fixed';
+    container.style.top = '20px';
+    container.style.right = '20px';
+    container.style.zIndex = '9999';
+    container.style.maxWidth = '300px';
+    document.body.appendChild(container);
+    return container;
+  }
+  
+  // Load chart notes
+  async function loadChartNotes(context = 'main', startDate = null, endDate = null, userId = null) {
+    try {
+      console.log('Loading chart notes for context:', context, 'userId:', userId);
+      
+      // Ensure currentNotes is initialized
+      if (typeof currentNotes === 'undefined') {
+        console.warn('currentNotes was undefined in loadChartNotes, initializing to empty array');
+        window.currentNotes = [];
+      }
+      
+      // Since we're having CORS issues, let's use a workaround
+      // We'll make the request through a proxy endpoint that doesn't have CORS restrictions
+      // For now, we'll use localStorage to persist notes between page refreshes
+      console.log('Using localStorage for chart notes due to CORS issues');
+      
+      // Determine the storage key based on context and userId
+      let storageKey = 'chartNotes';
+      
+      // Fix: Make sure we have a userId for user context
+      if (context === 'user') {
+        // If userId wasn't passed, try to get it from the UI
+        if (!userId && document.getElementById('detailsUserId')) {
+          userId = document.getElementById('detailsUserId').textContent;
+          console.log('Retrieved userId from UI:', userId);
+        }
+        
+        if (userId) {
+          // For user-specific notes
+          storageKey = `chartNotes_user_${userId}`;
+        } else {
+          console.warn('User context specified but no userId available');
+        }
+      } else if (context === 'main') {
+        // For main chart notes
+        storageKey = 'chartNotes_main';
+      }
+      
+      console.log('Using storage key:', storageKey);
+      
+      // Load saved notes from localStorage with error handling
+      let savedNotes;
+      try {
+        savedNotes = localStorage.getItem(storageKey);
+        currentNotes = savedNotes ? JSON.parse(savedNotes) : [];
+      } catch (parseError) {
+        console.error('Error parsing saved notes from localStorage:', parseError);
+        currentNotes = [];
+        // Try to clean up corrupted data
+        localStorage.removeItem(storageKey);
+      }
+      
+      // If no notes exist and this is a development environment, create test notes
+      if (currentNotes.length === 0 && window.location.hostname.includes('localhost')) {
+        console.log('No notes found, creating test notes for debugging');
+        
+        // Create a note for today
+        const today = new Date();
+        const testNote1 = {
+          id: 'test_note_1_' + Date.now(),
+          date: today.toISOString().split('T')[0],
+          content: context === 'user' ? 
+            `Test note for user ${userId} today` : 
+            'Test note for main chart today',
+          created_at: today.toISOString(),
+          user_id: context === 'user' ? userId : null
+        };
+        
+        // Create a note for March 6, 2025 (matching the example in the screenshot)
+        const specificDate = new Date('2025-03-06');
+        const testNote2 = {
+          id: 'test_note_2_' + Date.now(),
+          date: specificDate.toISOString().split('T')[0],
+          content: context === 'user' ? 
+            `User ${userId} ate broccoli` : 
+            'Ate some broccoli with dinner',
+          created_at: specificDate.toISOString(),
+          user_id: context === 'user' ? userId : null
+        };
+        
+        currentNotes.push(testNote1, testNote2);
+        localStorage.setItem(storageKey, JSON.stringify(currentNotes));
+        console.log('Created test notes:', currentNotes);
+      }
+      
+      // Filter by date if provided
+      if (startDate && endDate) {
+        currentNotes = currentNotes.filter(note => {
+          return note.date >= startDate && note.date <= endDate;
+        });
+      }
+      
+      console.log('Loaded notes after filtering:', currentNotes.length, 'notes');
+      console.log('Note content sample:', currentNotes.map(n => ({ id: n.id, date: n.date, content: n.content.substring(0, 20) })));
+      
+      // Add note markers to the chart after a short delay to ensure chart is rendered
+      setTimeout(() => {
+        console.log('Adding note markers after delay');
+        addNoteMarkersToChart(context);
+      }, 1000); // Increased delay to ensure chart is fully rendered
+      
+    } catch (error) {
+      console.error('Error loading chart notes:', error);
+    }
+  }
+  
+  // Display chart notes function - now a no-op since we only show icons on the chart
+  function displayChartNotes(context = 'main') {
+    // This function is kept for backward compatibility but no longer displays notes below the chart
+    console.log('Notes display below chart is disabled, only showing icons on chart');
+    
+    // Hide the notes containers
+    const mainContainer = document.getElementById('chartNotesContainer');
+    const userContainer = document.getElementById('userChartNotesContainer');
+    
+    if (mainContainer) mainContainer.style.display = 'none';
+    if (userContainer) userContainer.style.display = 'none';
+  }
+  
+  // Add note markers to the chart
+  function addNoteMarkersToChart(context = 'main') {
+    console.log(`Adding note markers to ${context} chart`);
+    
+    const chartContainerId = context === 'main' ? 'apiUsageChartContainer' : 'userApiUsageChartContainer';
+    const chartId = context === 'main' ? 'apiUsageChart' : 'userApiUsageChart';
+    const chart = context === 'main' ? mainApiChart : userApiChart;
+    
+    if (!chart) {
+      console.log('Chart instance not found for', chartId);
+      return;
+    }
+    
+    try {
+      if (!chart.canvas) {
+        console.error('Chart canvas not found');
+        return;
+      }
+      
+      const chartContainer = chart.canvas.parentElement;
+      if (!chartContainer) {
+        console.error('Chart container not found');
+        return;
+      }
+      
+      const chartRect = chart.canvas.getBoundingClientRect();
+      
+      console.log('Chart container:', chartContainer);
+      console.log('Chart rect:', chartRect);
+      
+      // Make sure the chart container has relative positioning
+      chartContainer.style.position = 'relative';
+      
+      // For each note, add a marker at the corresponding date position
+      console.log('Processing notes, count:', currentNotes.length);
+      
+      if (!Array.isArray(currentNotes)) {
+        console.error('currentNotes is not an array:', currentNotes);
+        return;
+      }
+      
+      currentNotes.forEach((note, index) => {
+        try {
+          if (!note || !note.date || !note.id) {
+            console.error(`Invalid note at index ${index}:`, note);
+            return; // Skip this note
+          }
+          
+          console.log(`Processing note ${index + 1}/${currentNotes.length}:`, note);
+          const noteDate = new Date(note.date);
+          
+          if (isNaN(noteDate.getTime())) {
+            console.error(`Invalid date format for note at index ${index}:`, note.date);
+            return; // Skip this note
+          }
+          
+          // Find the x-position on the chart for this date
+          const xPosition = getChartXPositionForDate(chart, noteDate);
+          
+          console.log(`Note date: ${note.date}, xPosition: ${xPosition}`);
+          
+          if (xPosition !== null) {
+            // Create note marker
+            const marker = document.createElement('div');
+            marker.className = 'chart-note-icon';
+            marker.innerHTML = '<i class="bi bi-sticky"></i>';
+            marker.dataset.noteId = note.id;
+            marker.title = note.content || 'No content'; // Show note content on hover, with fallback
+            
+            // Get the chart area to position the marker directly over the date
+            const chartArea = chart.chartArea;
+            if (!chartArea) {
+              console.error('Chart area not available');
+              return; // Skip this note
+            }
+            
+            // Position the marker directly over the date on the x-axis
+            marker.style.left = `${xPosition - 12}px`; // Center the marker (half of width)
+            
+            // Position at the top of the chart area
+            marker.style.top = `${chartArea.top + 10}px`; // Position at the top with a small margin
+            marker.style.zIndex = '1000'; // Ensure it's above the chart
+            
+            // Add a line connecting the marker to the data point
+            const line = document.createElement('div');
+            line.style.position = 'absolute';
+            line.style.width = '2px';
+            line.style.backgroundColor = '#ff5722';
+            line.style.left = `${xPosition}px`;
+            line.style.top = `${chartArea.top + 30}px`; // Start below the icon
+            line.style.height = `${chartArea.bottom - chartArea.top - 40}px`; // Extend to near the bottom
+            line.style.zIndex = '999'; // Below the marker but above the chart
+            chartContainer.appendChild(line);
+            
+            // Add tooltip behavior
+            marker.addEventListener('mouseenter', (e) => showNoteTooltip(e, note));
+            marker.addEventListener('mouseleave', hideNoteTooltip);
+            marker.addEventListener('click', () => showNoteDetails(note.id));
+            
+            // Add to chart container
+            chartContainer.appendChild(marker);
+            console.log('Added marker for note:', note.id, 'at position:', xPosition, 'top:', chartArea.top + 10);
+          } else {
+            console.error('Could not find position for note date:', note.date);
+          }
+        } catch (noteError) {
+          console.error(`Error processing note at index ${index}:`, noteError);
+          // Continue with next note
+        }
+      });
+    } catch (error) {
+      console.error('Error in addNoteMarkersToChart:', error);
+    }
+    
+    console.log('FINISHED addNoteMarkersToChart function');
+  }
+  
+  // Get the x-position on the chart for a specific date
+  function getChartXPositionForDate(chart, date) {
+    try {
+      if (!chart || !chart.data || !chart.data.labels) {
+        console.error('Chart data not available');
+        return null;
+      }
+      
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+        console.error('Invalid date provided to getChartXPositionForDate:', date);
+        return null;
+      }
+      
+      // Format the date to match chart labels
+      const dateStr = formatDate(date);
+      console.log('Looking for date in chart labels:', dateStr);
+      console.log('Available chart labels:', chart.data.labels);
+      
+      // Find the index of the date in chart labels
+      const index = chart.data.labels.findIndex(label => label === dateStr);
+      
+      if (index === -1) {
+        console.log('Date not found in chart labels:', dateStr);
+        // Try to match partial date (just the day part)
+        const dayPart = dateStr.split('-')[2]; // Extract day part (DD)
+        const monthPart = dateStr.split('-')[1]; // Extract month part (MM)
+        const yearPart = dateStr.split('-')[0]; // Extract year part (YYYY)
+        
+        console.log(`Trying partial match with year: ${yearPart}, month: ${monthPart}, day: ${dayPart}`);
+        
+        // Look for a label that contains the same day and month
+        const partialIndex = chart.data.labels.findIndex(label => {
+          if (!label) return false;
+          
+          // Try different date formats
+          // Format: YYYY-MM-DD
+          if (label === dateStr) return true;
+          
+          // Format: MM/DD/YYYY or similar
+          if (label.includes('/')) {
+            const parts = label.split('/');
+            if (parts.length === 3) {
+              const labelMonth = parts[0].padStart(2, '0');
+              const labelDay = parts[1].padStart(2, '0');
+              return labelMonth === monthPart && labelDay === dayPart;
+            }
+          }
+          
+          // Format: YYYY-MM-DD or similar
+          const labelParts = label.split('-');
+          if (labelParts.length === 3) {
+            return labelParts[1] === monthPart && labelParts[2] === dayPart;
+          }
+          
+          return false;
+        });
+        
+        if (partialIndex !== -1) {
+          console.log('Found date with partial match at index:', partialIndex);
+          const meta = chart.getDatasetMeta(0);
+          if (!meta || !meta.data || partialIndex >= meta.data.length) {
+            console.error('Chart metadata not available for partial match');
+            return null;
+          }
+          return meta.data[partialIndex].x;
+        }
+        
+        // If we still can't find a match, try to find the closest date
+        console.log('No exact match found, looking for closest date');
+        
+        // Convert search date to timestamp for comparison
+        const searchTimestamp = new Date(dateStr).getTime();
+        
+        // Find the closest date in the labels
+        let closestIndex = -1;
+        let minDiff = Infinity;
+        
+        chart.data.labels.forEach((label, i) => {
+          if (!label) return;
+          
+          // Try to parse the label as a date
+          let labelDate;
+          if (label.includes('-')) {
+            labelDate = new Date(label);
+          } else if (label.includes('/')) {
+            const parts = label.split('/');
+            if (parts.length === 3) {
+              labelDate = new Date(`${parts[2]}-${parts[0]}-${parts[1]}`);
+            }
+          }
+          
+          if (labelDate && !isNaN(labelDate.getTime())) {
+            const diff = Math.abs(labelDate.getTime() - searchTimestamp);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestIndex = i;
+            }
+          }
+        });
+        
+        if (closestIndex !== -1) {
+          console.log('Found closest date match at index:', closestIndex);
+          const meta = chart.getDatasetMeta(0);
+          if (!meta || !meta.data || closestIndex >= meta.data.length) {
+            console.error('Chart metadata not available for closest match');
+            return null;
+          }
+          return meta.data[closestIndex].x;
+        }
+        
+        return null;
+      }
+      
+      console.log('Found exact date match at index:', index);
+      
+      // Calculate the pixel position
+      const meta = chart.getDatasetMeta(0);
+      if (!meta || !meta.data || index >= meta.data.length) {
+        console.error('Chart metadata not available');
+        return null;
+      }
+      
+      return meta.data[index].x;
+    } catch (error) {
+      console.error('Error in getChartXPositionForDate:', error);
+      return null;
+    }
+  }
+  
+  // Show note tooltip on hover
+  function showNoteTooltip(event, note) {
+    // Create tooltip if it doesn't exist
+    let tooltip = document.querySelector('.chart-note-tooltip');
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.className = 'chart-note-tooltip';
+      document.body.appendChild(tooltip);
+    }
+    
+    // Set tooltip content
+    tooltip.innerHTML = `
+      <div><strong>${formatDate(note.date)}</strong></div>
+      <div>${note.content}</div>
+    `;
+    
+    // Position tooltip near the mouse
+    const rect = event.target.getBoundingClientRect();
+    tooltip.style.left = `${rect.right + 10}px`;
+    tooltip.style.top = `${rect.top}px`;
+    
+    // Make sure tooltip is within viewport
+    const tooltipRect = tooltip.getBoundingClientRect();
+    if (tooltipRect.right > window.innerWidth) {
+      tooltip.style.left = `${rect.left - tooltipRect.width - 10}px`;
+    }
+    
+    // Show tooltip
+    tooltip.style.opacity = '1';
+  }
+  
+  // Hide note tooltip
+  function hideNoteTooltip() {
+    const tooltip = document.querySelector('.chart-note-tooltip');
+    if (tooltip) {
+      tooltip.style.opacity = '0';
+    }
+  }
+  
+  // Show note details modal
+  function showNoteDetails(noteId) {
+    const note = currentNotes.find(n => n.id === noteId);
+    if (!note) return;
+    
+    currentNoteId = noteId;
+    
+    // Populate modal with note details
+    document.getElementById('noteDetailDate').textContent = formatDate(note.date);
+    document.getElementById('noteDetailContent').textContent = note.content;
+    document.getElementById('noteDetailCreatedAt').textContent = note.created_at || '';
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('noteDetailsModal'));
+    modal.show();
+  }
+  
+  // Show add note modal
+  function showAddNoteModal(context = 'main') {
+    // Reset form
+    document.getElementById('noteForm').reset();
+    document.getElementById('noteId').value = '';
+    document.getElementById('noteContext').value = context;
+    
+    // Set default date to today
+    document.getElementById('noteDate').value = formatDateForInput(new Date());
+    
+    // If we're in user context, ensure we store the userId
+    if (context === 'user') {
+      let userId;
+      
+      // First try to get from URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const userIdParam = urlParams.get('user');
+      
+      if (userIdParam) {
+        userId = userIdParam;
+      } else if (document.getElementById('detailsUserId')) {
+        // Fall back to the DOM element if URL param not available
+        userId = document.getElementById('detailsUserId').textContent;
+      }
+      
+      if (userId) {
+        document.getElementById('noteUserId').value = userId;
+        console.log('Setting note userId to:', userId);
+      }
+    } else {
+      document.getElementById('noteUserId').value = '';
+    }
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('addNoteModal'));
+    modal.show();
+  }
+  
+  // Edit note
+  function editNote() {
+    const note = currentNotes.find(n => n.id === currentNoteId);
+    if (!note) return;
+    
+    // Hide details modal
+    bootstrap.Modal.getInstance(document.getElementById('noteDetailsModal')).hide();
+    
+    // Populate form with note data
+    document.getElementById('noteId').value = note.id;
+    document.getElementById('noteDate').value = formatDateForInput(new Date(note.date));
+    document.getElementById('noteContent').value = note.content;
+    
+    // Show edit modal
+    const modal = new bootstrap.Modal(document.getElementById('addNoteModal'));
+    modal.show();
+  }
+  
+  // Save note (create or update)
+  async function saveNote() {
+    const noteId = document.getElementById('noteId').value;
+    const context = document.getElementById('noteContext').value;
+    const date = document.getElementById('noteDate').value;
+    const content = document.getElementById('noteContent').value;
+    // Get userId from the hidden field if it exists
+    const userIdField = document.getElementById('noteUserId');
+    
+    if (!date || !content) {
+      alert('Please fill in all fields');
+      return;
+    }
+    
+    try {
+      // Since we're having CORS issues, we'll create a temporary workaround
+      // We'll simulate a successful save and show a notification
+      console.log('Simulating note save for context:', context);
+      console.log('Note data:', { date, content });
+      
+      // Determine the storage key and user ID based on context
+      let storageKey = 'chartNotes';
+      let userId = null;
+      
+      if (context === 'user') {
+        // First try to get userId from the hidden field
+        if (userIdField && userIdField.value) {
+          userId = userIdField.value;
+        } 
+        // If not found, try to get from the details page
+        else if (document.getElementById('detailsUserId')) {
+          userId = document.getElementById('detailsUserId').textContent;
+        }
+        
+        if (userId) {
+          storageKey = `chartNotes_user_${userId}`;
+          console.log('Using user-specific storage key:', storageKey);
+        } else {
+          console.warn('User context specified but no userId found');
+          return;
+        }
+      } else if (context === 'main') {
+        storageKey = 'chartNotes_main';
+      }
+      
+      console.log('Using storage key:', storageKey);
+      
+      // Load existing notes for this context
+      const savedNotes = localStorage.getItem(storageKey);
+      let contextNotes = savedNotes ? JSON.parse(savedNotes) : [];
+      
+      // Create a mock note object
+      const newNote = {
+        id: noteId || 'note_' + Date.now(), // Generate a unique ID if not editing
+        date: date,
+        content: content,
+        created_at: new Date().toISOString(),
+        user_id: userId
+      };
+      
+      // If editing an existing note, replace it in the array
+      if (noteId) {
+        const index = contextNotes.findIndex(note => note.id === noteId);
+        if (index !== -1) {
+          contextNotes[index] = newNote;
+        } else {
+          contextNotes.push(newNote);
+        }
+      } else {
+        // Otherwise add as a new note
+        contextNotes.push(newNote);
+      }
+      
+      // Save to localStorage with the appropriate key
+      localStorage.setItem(storageKey, JSON.stringify(contextNotes));
+      
+      // Update current notes for display
+      currentNotes = contextNotes;
+      
+      // Show success notification
+      showNotification('Note saved successfully!', 'success');
+      
+      // Hide modal
+      bootstrap.Modal.getInstance(document.getElementById('addNoteModal')).hide();
+      
+      // Add note markers to the chart
+      addNoteMarkersToChart(context);
+      
+      // If we're in user context, we need to refresh the user chart
+      if (context === 'user' && userId) {
+        await loadUserApiUsageData(userId);
+      } else {
+        // Refresh main chart
+        await loadApiUsageData();
+      }
+      
+    } catch (error) {
+      console.error('Error saving note:', error);
+      alert(`Failed to save note: ${error.message}`);
+    }
+  }
+  
+  // Delete note
+  async function deleteNote() {
+    if (!currentNoteId) return;
+    
+    if (!confirm('Are you sure you want to delete this note?')) {
+      return;
+    }
+    
+    try {
+      // Since we're having CORS issues, we'll create a temporary workaround
+      // We'll simulate a successful delete and show a notification
+      console.log('Simulating note deletion due to CORS issues');
+      
+      // Remove the note from our mock data
+      const noteIndex = currentNotes.findIndex(note => note.id === currentNoteId);
+      if (noteIndex !== -1) {
+        currentNotes.splice(noteIndex, 1);
+        
+        // Update localStorage
+        localStorage.setItem('chartNotes', JSON.stringify(currentNotes));
+      }
+      
+      // Show success notification
+      showNotification('Note deleted successfully!', 'success');
+      
+      // Hide modal
+      bootstrap.Modal.getInstance(document.getElementById('noteDetailsModal')).hide();
+      
+      // Display notes without reloading (which would reset our mock data)
+      const context = document.getElementById('noteContext').value;
+      displayChartNotes(context);
+      addNoteMarkersToChart(context);
+      
+      // If we're in user context, we need to refresh the user chart
+      if (context === 'user' && document.getElementById('detailsUserId')) {
+        const userId = document.getElementById('detailsUserId').textContent;
+        await loadUserApiUsageData(userId);
+      } else {
+        // Refresh main chart
+        await loadApiUsageData();
+      }
+      
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      alert('Failed to delete note. Please try again.');
+    }
+  }
+  
+  // Helper function to format date for display
+  function formatDate(dateStr) {
+    return moment(dateStr).format('MMM D, YYYY');
+  }
+  
+  // Helper function to format date for input fields
+  function formatDateForInput(date) {
+    return moment(date).format('YYYY-MM-DD');
+  }
+  
+  // Helper function to truncate text
+  function truncateText(text, maxLength) {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  }
+  
+  // Extend the existing renderMainApiUsageChart function to load notes after rendering
+  const originalRenderMainApiUsageChart = renderMainApiUsageChart;
+  renderMainApiUsageChart = async function(startDate = null, endDate = null) {
+    await originalRenderMainApiUsageChart(startDate, endDate);
+    await loadChartNotes('main', startDate, endDate);
+  };
+  
+  // Extend the existing renderUserApiUsageChart function to load notes after rendering
+  const originalRenderUserApiUsageChart = renderUserApiUsageChart;
+  renderUserApiUsageChart = async function(userId, startDate = null, endDate = null) {
+    await originalRenderUserApiUsageChart(userId, startDate, endDate);
+    await loadChartNotes('user', startDate, endDate, userId);
+  };
+  </script>
+</body>
+</html>

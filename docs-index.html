@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ManOverMachine API Documentation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-color: #45ac48;
+            --brand-color-dark: #3a9040;
+            --brand-light: #e8f5e9;
+            --sidebar-width: 280px;
+            --header-height: 60px;
+            --font-family: 'Inter', sans-serif;
+            --code-bg: #2d2d2d;
+            --code-color: #f8f8f2;
+        }
+
+        body {
+            font-family: var(--font-family);
+            margin: 0;
+            padding: 0;
+            background: #f8f9fa;
+        }
+
+        /* Header Styles */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background: white;
+            border-bottom: 1px solid #e9ecef;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+        }
+
+        .header-logo {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--brand-color);
+            text-decoration: none;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            position: fixed;
+            top: var(--header-height);
+            left: 0;
+            bottom: 0;
+            width: var(--sidebar-width);
+            background: white;
+            border-right: 1px solid #e9ecef;
+            overflow-y: auto;
+            padding: 2rem 0;
+        }
+
+        .nav-link {
+            color: #495057;
+            padding: 0.5rem 2rem;
+            text-decoration: none;
+            display: block;
+        }
+
+        .nav-link:hover {
+            color: var(--brand-color);
+            background: var(--brand-light);
+        }
+
+        .nav-link.active {
+            color: var(--brand-color);
+            background: var(--brand-light);
+            border-right: 3px solid var(--brand-color);
+        }
+
+        /* Main Content Styles */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--header-height);
+            padding: 2rem 3rem;
+            max-width: 900px;
+        }
+
+        h1, h2, h3 {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        h1 { font-size: 2.5rem; }
+        h2 { font-size: 1.75rem; padding-top: 1rem; }
+        h3 { font-size: 1.25rem; }
+
+        /* Code Block Styles */
+        pre {
+            background: var(--code-bg);
+            color: var(--code-color);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        code {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        /* API Endpoint Styles */
+        .endpoint {
+            margin: 2rem 0;
+            padding: 2rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .http-method {
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            margin-right: 1rem;
+        }
+
+        .http-method.post {
+            background: #28a745;
+            color: white;
+        }
+
+        .endpoint-url {
+            font-family: monospace;
+            color: #495057;
+        }
+
+        /* Table Styles */
+        table {
+            width: 100%;
+            margin: 1rem 0;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            border: 1px solid #e9ecef;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+
+        /* Response Example Styles */
+        .response-example {
+            margin-top: 1rem;
+        }
+
+        .tab-buttons {
+            margin-bottom: 1rem;
+        }
+
+        .tab-button {
+            padding: 0.5rem 1rem;
+            border: none;
+            background: none;
+            color: #6c757d;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab-button.active {
+            color: var(--brand-color);
+            border-bottom-color: var(--brand-color);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <a href="/" class="header-logo">ManOverMachine API</a>
+    </header>
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <a href="#introduction" class="nav-link active">Introduction</a>
+        <a href="#authentication" class="nav-link">Authentication</a>
+        <a href="#user-auth-api" class="nav-link">User Account API</a>
+        <a href="#chatgpt" class="nav-link">ChatGPT API</a>
+        <a href="#firecrawl" class="nav-link">Firecrawl API</a>
+        <a href="#nanobanana" class="nav-link">NanoBanana API</a>
+        <a href="#domain-management" class="nav-link">Domain Management</a>
+        <a href="#timezone" class="nav-link">Timezone</a>
+        <a href="#errors" class="nav-link">Error Handling</a>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <h1 id="introduction">ManOverMachine API Documentation</h1>
+        <p>Welcome to the ManOverMachine API documentation. Our API provides access to powerful AI and web scraping capabilities through a simple REST interface.</p>
+
+        <h2 id="authentication">Authentication</h2>
+        <p>All API requests require authentication using an API key. Include your API key in the <code>x-api-key</code> header with each request.</p>
+        <pre><code>curl -H "x-api-key: your_api_key" ...</code></pre>
+
+        <div class="endpoint" id="user-auth-api">
+            <h2>User Account Information API</h2>
+            <div class="endpoint-header">
+                <span class="http-method get">GET</span>
+                <span class="endpoint-url">/users</span>
+            </div>
+            <p>The User Account Information API provides access to user account details including status, credits, and profile information.</p>
+
+            <h3>API Details</h3>
+            <ul>
+                <li><strong>Base URL:</strong> <code>https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1</code></li>
+                <li><strong>Authentication:</strong> API Key in header</li>
+            </ul>
+
+            <h3>Functionality</h3>
+            <p>This API provides the following core functionality:</p>
+            <ul>
+                <li>User account verification</li>
+                <li>Credit balance checking</li>
+                <li>Account status verification</li>
+                <li>User profile information retrieval</li>
+            </ul>
+
+            <h3>Authentication</h3>
+            <p>Include your API key in the <code>x-api-key</code> header with each request.</p>
+
+            <h3>Example Request</h3>
+            <pre><code>curl -X GET https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1/users \
+    -H "Content-Type: application/json" \
+    -H "x-api-key: your_api_key"</code></pre>
+
+            <h3>Example Response</h3>
+            <pre><code>{
+    "user": {
+        "user_id": "59a25033-3915-4ae2-8b1a-29dced12114b",
+        "email": "user@example.com",
+        "status": "active",
+        "credits": 227,
+        "plan_type": "credit_based",
+        "created_at": 1740246661,
+        "updated_at": 1742351793
+    }
+}</code></pre>
+
+            <h3>Response Fields</h3>
+            <table>
+                <tr>
+                    <th>Field</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>user_id</td>
+                    <td>string</td>
+                    <td>Unique identifier for the user</td>
+                </tr>
+                <tr>
+                    <td>email</td>
+                    <td>string</td>
+                    <td>User's email address</td>
+                </tr>
+                <tr>
+                    <td>status</td>
+                    <td>string</td>
+                    <td>Account status ("active" or "inactive")</td>
+                </tr>
+                <tr>
+                    <td>credits</td>
+                    <td>integer</td>
+                    <td>Current credit balance</td>
+                </tr>
+                <tr>
+                    <td>plan_type</td>
+                    <td>string</td>
+                    <td>Subscription plan type ("credit_based" or "plan_based")</td>
+                </tr>
+                <tr>
+                    <td>created_at</td>
+                    <td>integer</td>
+                    <td>Account creation timestamp (Unix timestamp in US Central time)</td>
+                </tr>
+                <tr>
+                    <td>updated_at</td>
+                    <td>integer</td>
+                    <td>Last update timestamp (Unix timestamp in US Central time)</td>
+                </tr>
+            </table>
+
+            <h3>Error Responses</h3>
+            <ul>
+                <li><strong>401</strong> - Invalid or missing API key</li>
+                <li><strong>404</strong> - User not found</li>
+                <li><strong>500</strong> - Internal server error</li>
+            </ul>
+        </div>
+
+        <div class="endpoint" id="chatgpt">
+            <h2>ChatGPT API</h2>
+            <div class="endpoint-header">
+                <span class="http-method post">POST</span>
+                <span class="endpoint-url">/chatgpt</span>
+            </div>
+            <p>Send prompts to ChatGPT and receive AI-generated responses.</p>
+            
+            <h3>API Details</h3>
+            <ul>
+                <li><strong>Base URL:</strong> <code>https://1xt5le1gn6.execute-api.us-east-2.amazonaws.com/v1</code></li>
+                <li><strong>Authentication:</strong> API Key in header</li>
+            </ul>
+
+            <h3>Request Parameters</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Type</th>
+                    <th>Required</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>prompt</td>
+                    <td>string</td>
+                    <td>Yes</td>
+                    <td>The prompt to send to ChatGPT</td>
+                </tr>
+                <tr>
+                    <td>model</td>
+                    <td>string</td>
+                    <td>No</td>
+                    <td>Model to use (default: gpt-3.5-turbo)</td>
+                </tr>
+                <tr>
+                    <td>max_tokens</td>
+                    <td>integer</td>
+                    <td>No</td>
+                    <td>Maximum tokens in response (default: 100)</td>
+                </tr>
+            </table>
+
+            <h3>Example Request</h3>
+            <pre><code>curl -X POST https://1xt5le1gn6.execute-api.us-east-2.amazonaws.com/v1/chatgpt \
+    -H "Content-Type: application/json" \
+    -H "x-api-key: your_api_key" \
+    -d '{
+        "prompt": "What is artificial intelligence?",
+        "model": "gpt-3.5-turbo",
+        "max_tokens": 100
+    }'</code></pre>
+
+            <h3>Example Response</h3>
+            <pre><code>{
+    "response": "Artificial intelligence (AI) is a branch of computer science...",
+    "model": "gpt-3.5-turbo",
+    "max_tokens": 100,
+    "credits_remaining": 226
+}</code></pre>
+        </div>
+
+        <div class="endpoint" id="firecrawl">
+            <h2>Firecrawl API</h2>
+            <div class="endpoint-header">
+                <span class="http-method post">POST</span>
+                <span class="endpoint-url">/firecrawl</span>
+            </div>
+            <p>Extract clean, formatted content from any webpage.</p>
+
+            <h3>Request Parameters</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Type</th>
+                    <th>Required</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>url</td>
+                    <td>string</td>
+                    <td>Yes</td>
+                    <td>The URL to scrape content from</td>
+                </tr>
+            </table>
+
+            <h3>Example Request</h3>
+            <pre><code>curl -X POST https://cnn1mq9b3k.execute-api.us-east-2.amazonaws.com/test/firecrawl \
+    -H "Content-Type: application/json" \
+    -H "x-api-key: your_api_key" \
+    -d '{
+        "url": "https://example.com"
+    }'</code></pre>
+
+            <h3>Example Response</h3>
+            <pre><code>{
+    "statusCode": 200,
+    "headers": {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,X-Api-Key",
+        "Access-Control-Allow-Methods": "OPTIONS,POST"
+    },
+    "body": {
+        "content": "# Example Domain\n\nThis domain is for use in illustrative examples..."
+    }
+}</code></pre>
+        </div>
+
+        <div class="endpoint" id="nanobanana">
+            <h2>NanoBanana API</h2>
+            <div class="endpoint-header">
+                <span class="http-method post">POST</span>
+                <span class="endpoint-url">/nanobanana</span>
+            </div>
+            <p>Generate high-quality AI images using Google's Gemini 2.5 Flash Image Preview model (Nano Banana). Supports both text-to-image generation and advanced image editing with reference images.</p>
+            
+            <h3>Base URL</h3>
+            <pre><code>https://inbhkc0omk.execute-api.us-east-2.amazonaws.com/v1</code></pre>
+            
+            <h3>Operation Modes</h3>
+            <ul>
+                <li><strong>Text-to-Image Generation:</strong> Create images from text descriptions</li>
+                <li><strong>Image Editing:</strong> Modify existing images using text prompts and reference images</li>
+            </ul>
+            
+            <h3>Parameters</h3>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>prompt</code></td>
+                        <td>string</td>
+                        <td>Yes</td>
+                        <td>Text description for generation or editing instructions</td>
+                    </tr>
+                    <tr>
+                        <td><code>aspect_ratio</code></td>
+                        <td>string</td>
+                        <td>No</td>
+                        <td>Image aspect ratio for text-to-image (default: "1:1"). Examples: "16:9", "4:3", "3:2"</td>
+                    </tr>
+                    <tr>
+                        <td><code>reference_image</code></td>
+                        <td>string</td>
+                        <td>No</td>
+                        <td>Base64 encoded image data for image editing mode</td>
+                    </tr>
+                    <tr>
+                        <td><code>image_mime_type</code></td>
+                        <td>string</td>
+                        <td>No</td>
+                        <td>MIME type of reference image (default: "image/png")</td>
+                    </tr>
+                    <tr>
+                        <td><code>model</code></td>
+                        <td>string</td>
+                        <td>No</td>
+                        <td>AI model to use (default: "gemini-2.5-flash-image-preview")</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3>Text-to-Image Example</h3>
+            <pre><code>curl -X POST https://inbhkc0omk.execute-api.us-east-2.amazonaws.com/v1/nanobanana \
+    -H "Content-Type: application/json" \
+    -H "x-api-key: your_api_key" \
+    -d '{
+        "prompt": "A bright yellow rubber duck wearing a tiny red pirate hat, floating in a bathtub filled with rainbow-colored soap bubbles",
+        "aspect_ratio": "1:1"
+    }'</code></pre>
+            
+            <h3>Image Editing Example</h3>
+            <pre><code>curl -X POST https://inbhkc0omk.execute-api.us-east-2.amazonaws.com/v1/nanobanana \
+    -H "Content-Type: application/json" \
+    -H "x-api-key: your_api_key" \
+    -d '{
+        "prompt": "Change only the duck to have black and white cow spots. Keep everything else the same.",
+        "reference_image": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
+        "image_mime_type": "image/png"
+    }'</code></pre>
+            
+            <h3>Example Response</h3>
+            <pre><code>{
+    "image_data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
+    "image_format": "png",
+    "model": "gemini-2.5-flash-image-preview",
+    "operation_type": "image editing",
+    "aspect_ratio": null,
+    "prompt": "Change only the duck to have black and white cow spots. Keep everything else the same.",
+    "response_text": "Here's your pirate duck with a Holstein cow pattern!",
+    "has_reference_image": true,
+    "credits_remaining": 47055.0
+}</code></pre>
+            
+            <h3>Response Fields</h3>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>image_data</code></td>
+                        <td>string</td>
+                        <td>Base64 encoded PNG image data</td>
+                    </tr>
+                    <tr>
+                        <td><code>image_format</code></td>
+                        <td>string</td>
+                        <td>Image format (always "png")</td>
+                    </tr>
+                    <tr>
+                        <td><code>model</code></td>
+                        <td>string</td>
+                        <td>AI model used for generation</td>
+                    </tr>
+                    <tr>
+                        <td><code>operation_type</code></td>
+                        <td>string</td>
+                        <td>"text-to-image generation" or "image editing"</td>
+                    </tr>
+                    <tr>
+                        <td><code>aspect_ratio</code></td>
+                        <td>string</td>
+                        <td>Aspect ratio (null for image editing)</td>
+                    </tr>
+                    <tr>
+                        <td><code>prompt</code></td>
+                        <td>string</td>
+                        <td>Original prompt used</td>
+                    </tr>
+                    <tr>
+                        <td><code>response_text</code></td>
+                        <td>string</td>
+                        <td>Descriptive text about the generated/edited image</td>
+                    </tr>
+                    <tr>
+                        <td><code>has_reference_image</code></td>
+                        <td>boolean</td>
+                        <td>Whether a reference image was provided</td>
+                    </tr>
+                    <tr>
+                        <td><code>credits_remaining</code></td>
+                        <td>number</td>
+                        <td>Remaining credits in your account</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3>Image Editing Use Cases</h3>
+            <ul>
+                <li><strong>Style Transfer:</strong> "Transform this photo into a watercolor painting"</li>
+                <li><strong>Object Addition:</strong> "Add sunglasses to this person"</li>
+                <li><strong>Color Changes:</strong> "Change this car from blue to red"</li>
+                <li><strong>Background Replacement:</strong> "Put this person in a forest setting"</li>
+                <li><strong>Product Mockups:</strong> "Place this logo on a t-shirt"</li>
+                <li><strong>Enhancement:</strong> "Improve the lighting in this photo"</li>
+            </ul>
+            
+            <h3>Usage Notes</h3>
+            <ul>
+                <li><strong>Cost:</strong> 1 credit per image generation or editing</li>
+                <li><strong>Image Size:</strong> Generated images are typically 1-2MB in size</li>
+                <li><strong>Processing Time:</strong> 10-15 seconds for generation, 15-20 seconds for editing</li>
+                <li><strong>Format:</strong> Images are returned as base64 encoded PNG data</li>
+                <li><strong>Quality:</strong> High-resolution images (1024x1024) suitable for professional use</li>
+                <li><strong>Reference Images:</strong> Supports PNG, JPEG, and other common formats</li>
+            </ul>
+            
+            <h3>JavaScript Examples</h3>
+            
+            <h4>Text-to-Image Generation</h4>
+            <pre><code>async function generateImage(prompt, aspectRatio = '1:1') {
+    const response = await fetch('https://inbhkc0omk.execute-api.us-east-2.amazonaws.com/v1/nanobanana', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': 'your_api_key'
+        },
+        body: JSON.stringify({
+            prompt: prompt,
+            aspect_ratio: aspectRatio
+        })
+    });
+    
+    const data = await response.json();
+    
+    // Create image element
+    const img = document.createElement('img');
+    img.src = 'data:image/png;base64,' + data.image_data;
+    document.body.appendChild(img);
+    
+    return data;
+}</code></pre>
+            
+            <h4>Image Editing</h4>
+            <pre><code>async function editImage(prompt, referenceImageBase64) {
+    const response = await fetch('https://inbhkc0omk.execute-api.us-east-2.amazonaws.com/v1/nanobanana', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': 'your_api_key'
+        },
+        body: JSON.stringify({
+            prompt: prompt,
+            reference_image: referenceImageBase64,
+            image_mime_type: 'image/png'
+        })
+    });
+    
+    const data = await response.json();
+    
+    // Create image element
+    const img = document.createElement('img');
+    img.src = 'data:image/png;base64,' + data.image_data;
+    document.body.appendChild(img);
+    
+    return data;
+}</code></pre>
+        </div>
+
+        <h2 id="domain-management">Domain Management</h2>
+        <p>The ManOverMachine API includes domain usage tracking and restriction features to prevent unauthorized use of your API key across multiple domains.</p>
+        
+        <h3>Multiple Domain Whitelist</h3>
+        <p>By default, each API key is restricted to usage from a single domain. However, certain users can be whitelisted to use their API key across multiple domains.</p>
+        
+        <h4>Whitelist Feature</h4>
+        <ul>
+            <li>Users with the <code>allow_multiple_domains</code> flag set to <code>true</code> can use their API key from any domain</li>
+            <li>This feature can only be enabled by administrators through the admin interface</li>
+            <li>Domain usage is still tracked for whitelisted users, but no restrictions are applied</li>
+        </ul>
+        
+        <h4>Domain Detection</h4>
+        <p>The API detects source domains through multiple methods (in order of priority):</p>
+        <ol>
+            <li>Explicit <code>x-source-domain</code> header</li>
+            <li>Origin header</li>
+            <li>Referer header</li>
+            <li>API Gateway domain name</li>
+            <li>Source IP address (as fallback)</li>
+        </ol>
+        
+        <h2 id="timezone">Timezone</h2>
+        <p>All timestamps in the ManOverMachine API system are standardized to US Central time (America/Chicago).</p>
+        
+        <h3>Affected Components</h3>
+        <ul>
+            <li>User details (<code>created_at</code>, <code>updated_at</code>)</li>
+            <li>Credit history timestamps</li>
+            <li>Admin interface displays</li>
+        </ul>
+        
+        <h3>Timestamp Format</h3>
+        <p>Timestamps are stored as Unix timestamps (seconds since epoch) but are displayed in US Central time in the admin interface.</p>
+
+        <h2 id="errors">Error Handling</h2>
+        <p>The API uses conventional HTTP response codes to indicate the success or failure of an API request.</p>
+        <ul>
+            <li><strong>200</strong> - Success</li>
+            <li><strong>400</strong> - Bad Request (invalid parameters)</li>
+            <li><strong>401</strong> - Unauthorized (invalid API key)</li>
+            <li><strong>402</strong> - Payment Required (insufficient credits)</li>
+            <li><strong>500</strong> - Internal Server Error</li>
+        </ul>
+
+        <h3>Error Response Format</h3>
+        <pre><code>{
+    "statusCode": 400,
+    "headers": {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,X-Api-Key",
+        "Access-Control-Allow-Methods": "OPTIONS,POST"
+    },
+    "body": {
+        "error": "Error message describing what went wrong"
+    }
+}</code></pre>
+        <div class="endpoint" id="stripe">
+            <h2>Stripe Subscription API</h2>
+            <div class="endpoint-header">
+                <span class="http-method post">POST</span>
+                <span class="endpoint-url">/portal</span>
+            </div>
+            <p>Create a Stripe Customer Portal session for subscription management.</p>
+
+            <h3>API Details</h3>
+            <ul>
+                <li><strong>Base URL:</strong> <code>https://9ng4x3w4u0.execute-api.us-east-2.amazonaws.com/prod</code></li>
+                <li><strong>Authentication:</strong> None (internal API)</li>
+            </ul>
+
+            <h3>Request Parameters</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Type</th>
+                    <th>Required</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>user_id</td>
+                    <td>string</td>
+                    <td>Yes</td>
+                    <td>The user ID to create a portal session for</td>
+                </tr>
+                <tr>
+                    <td>return_url</td>
+                    <td>string</td>
+                    <td>No</td>
+                    <td>URL to return to after managing subscription (default: account page)</td>
+                </tr>
+            </table>
+
+            <h3>Example Request</h3>
+            <pre><code>curl -X POST https://9ng4x3w4u0.execute-api.us-east-2.amazonaws.com/prod/portal \
+    -H "Content-Type: application/json" \
+    -d '{
+        "user_id": "59a25033-3915-4ae2-8b1a-29dced12114b",
+        "return_url": "https://manovermachine.com/account"
+    }'</code></pre>
+
+            <h3>Example Response</h3>
+            <pre><code>{
+    "url": "https://billing.stripe.com/session/live_YWNjdF8xTlRRWlBjSkNCd0N5d1BYWixzdWJfTlRRWlBjSkNCd0N5d1BYWg001a2U5QXg"
+}</code></pre>
+
+            <div class="endpoint-header">
+                <span class="http-method post">POST</span>
+                <span class="endpoint-url">/checkout</span>
+            </div>
+            <p>Create a Stripe Checkout session for new subscription signup.</p>
+
+            <h3>Request Parameters</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Type</th>
+                    <th>Required</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>user_id</td>
+                    <td>string</td>
+                    <td>Yes</td>
+                    <td>The user ID to create a checkout session for</td>
+                </tr>
+                <tr>
+                    <td>price_id</td>
+                    <td>string</td>
+                    <td>Yes</td>
+                    <td>The Stripe price ID for the subscription plan</td>
+                </tr>
+                <tr>
+                    <td>success_url</td>
+                    <td>string</td>
+                    <td>No</td>
+                    <td>URL to redirect to after successful payment</td>
+                </tr>
+                <tr>
+                    <td>cancel_url</td>
+                    <td>string</td>
+                    <td>No</td>
+                    <td>URL to redirect to if checkout is canceled</td>
+                </tr>
+            </table>
+
+            <h3>Example Request</h3>
+            <pre><code>curl -X POST https://9ng4x3w4u0.execute-api.us-east-2.amazonaws.com/prod/checkout \
+    -H "Content-Type: application/json" \
+    -d '{
+        "user_id": "59a25033-3915-4ae2-8b1a-29dced12114b",
+        "price_id": "price_1234567890"
+    }'</code></pre>
+
+            <h3>Example Response</h3>
+            <pre><code>{
+    "url": "https://checkout.stripe.com/pay/cs_live_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0"
+}</code></pre>
+
+            <div class="endpoint-header">
+                <span class="http-method post">POST</span>
+                <span class="endpoint-url">/webhook</span>
+            </div>
+            <p>Webhook endpoint for Stripe events (subscription lifecycle, payments).</p>
+
+            <h3>Handled Events</h3>
+            <ul>
+                <li><strong>customer.subscription.created</strong> - When a new subscription is created</li>
+                <li><strong>customer.subscription.updated</strong> - When a subscription is updated</li>
+                <li><strong>customer.subscription.deleted</strong> - When a subscription is canceled</li>
+                <li><strong>invoice.payment_succeeded</strong> - When a payment is successful (adds credits)</li>
+            </ul>
+
+            <h3>Credit Allocation</h3>
+            <p>Credits are automatically added to user accounts based on their subscription plan:</p>
+            <table>
+                <tr>
+                    <th>Plan</th>
+                    <th>Credits</th>
+                </tr>
+                <tr>
+                    <td>Basic</td>
+                    <td>100</td>
+                </tr>
+                <tr>
+                    <td>Premium</td>
+                    <td>250</td>
+                </tr>
+                <tr>
+                    <td>Business</td>
+                    <td>500</td>
+                </tr>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        // Add smooth scrolling to nav links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', e => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href').substring(1);
+                document.getElementById(targetId).scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+
+        // Update active nav link on scroll
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('h1, h2');
+            let currentSection = 'introduction';
+
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (window.pageYOffset >= sectionTop - 100) {
+                    currentSection = section.id || currentSection;
+                }
+            });
+
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${currentSection}`) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

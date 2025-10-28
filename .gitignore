@@ -42,3 +42,6 @@ windsurf_deployment.yaml
 # IDE
 .idea
 .vscode
+
+# Local Netlify folder
+.netlify
