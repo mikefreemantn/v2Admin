@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 const API_BASE_URL = 'https://xwkwzbjifh.execute-api.us-east-2.amazonaws.com/v1';
 const API_KEY = 'ri_9fbcb675c4e1';
 
+// Configure the route to allow longer execution time
+export const maxDuration = 30; // 30 seconds
+export const dynamic = 'force-dynamic';
+
 // Simple in-memory cache
 interface CacheItem {
   data: any;
@@ -72,34 +76,49 @@ export async function POST(request: NextRequest) {
     console.log('Headers:', headers);
     console.log('Data:', data);
     
-    // Make the API request
-    const response = await fetch(url, {
-      method: method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers
-      },
-      body: data ? JSON.stringify(data) : undefined
-    });
+    // Create an AbortController with a 30-second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
-    // Get the response data
-    const responseData = await response.json().catch(() => null);
-    
-    // Cache successful GET responses (but never cache credit history)
-    if (!shouldSkipCache && method?.toUpperCase() === 'GET' && response.ok) {
-      cache.set(cacheKey, {
-        data: responseData,
-        expiry: Date.now() + cacheTTL
+    try {
+      // Make the API request
+      const response = await fetch(url, {
+        method: method || 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        },
+        body: data ? JSON.stringify(data) : undefined,
+        signal: controller.signal
       });
-      console.log(`Cached response for: ${cacheKey}`);
+      
+      clearTimeout(timeoutId);
+      
+      // Get the response data
+      const responseData = await response.json().catch(() => null);
+      
+      // Cache successful GET responses (but never cache credit history)
+      if (!shouldSkipCache && method?.toUpperCase() === 'GET' && response.ok) {
+        cache.set(cacheKey, {
+          data: responseData,
+          expiry: Date.now() + cacheTTL
+        });
+        console.log(`Cached response for: ${cacheKey}`);
+      }
+      
+      // Return the response
+      return NextResponse.json({
+        status: response.status,
+        statusText: response.statusText,
+        data: responseData
+      });
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout - the API took too long to respond');
+      }
+      throw error;
     }
-    
-    // Return the response
-    return NextResponse.json({
-      status: response.status,
-      statusText: response.statusText,
-      data: responseData
-    });
   } catch (error: any) {
     console.error('Proxy error:', error);
     return NextResponse.json(

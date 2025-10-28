@@ -78,12 +78,18 @@ export function PremiumAnalyticsDashboard() {
       
       const apiData = data.data as ApiUsageResponse;
       
+      console.log('Raw API response:', apiData);
+      console.log('API usage array length:', apiData?.api_usage?.length);
+      
       // Check if api_usage exists and is an array
       if (apiData && apiData.api_usage && Array.isArray(apiData.api_usage)) {
         // Sort data by date (ascending)
         const sortedData = [...apiData.api_usage].sort((a, b) => 
           new Date(a.date).getTime() - new Date(b.date).getTime()
         );
+        
+        console.log('Sorted data length:', sortedData.length);
+        console.log('First few items:', sortedData.slice(0, 3));
         
         setApiUsage(sortedData);
         setTotalCalls(apiData.total_calls || 0);
@@ -206,7 +212,10 @@ export function PremiumAnalyticsDashboard() {
 
   // Filter data based on selected date range
   const getFilteredData = () => {
-    if (!apiUsage.length) return [];
+    if (!apiUsage.length) {
+      console.log('No API usage data available');
+      return [];
+    }
     
     const today = new Date();
     let daysToSubtract = 30;
@@ -219,10 +228,25 @@ export function PremiumAnalyticsDashboard() {
     
     const startDate = subDays(today, daysToSubtract);
     
-    return apiUsage.filter(item => {
-      const itemDate = parseISO(item.date);
-      return itemDate >= startDate;
+    const filtered = apiUsage.filter(item => {
+      try {
+        const itemDate = parseISO(item.date);
+        return itemDate >= startDate;
+      } catch (e) {
+        console.error('Error parsing date:', item.date, e);
+        return false;
+      }
     });
+    
+    console.log(`Filtered data: ${filtered.length} items out of ${apiUsage.length} for ${dateRange}`);
+    
+    // Limit to last 90 data points to prevent overwhelming the chart
+    const limited = filtered.slice(-90);
+    if (limited.length < filtered.length) {
+      console.log(`Limited data to last 90 points (was ${filtered.length})`);
+    }
+    
+    return limited;
   };
 
   // Get services from the data
@@ -236,7 +260,10 @@ export function PremiumAnalyticsDashboard() {
       });
     });
     
-    return Array.from(services);
+    const serviceArray = Array.from(services);
+    console.log('Services found:', serviceArray);
+    
+    return serviceArray;
   };
 
   // Get service display name
@@ -260,37 +287,68 @@ export function PremiumAnalyticsDashboard() {
     const filteredData = getFilteredData();
     const services = getServices();
     
+    console.log('formatChartData - filteredData length:', filteredData.length);
+    console.log('formatChartData - services:', services);
+    
     // If we have no real data, return empty array
     if (filteredData.length === 0) {
-      console.log('No data available');
+      console.log('No filtered data available for chart');
       return [];
     }
     
-    console.log('Using actual API data for charts');
-    return filteredData.map(item => {
-      const formattedDate = format(parseISO(item.date), 'MMM d');
-      const result: any = { date: formattedDate };
-      
-      services.forEach(service => {
-        if (item.by_service && item.by_service[service]) {
-          // Use actual data when available
-          result[getServiceDisplayName(service)] = item.by_service[service];
-        } else {
-          // Use zero for services with no data
-          result[getServiceDisplayName(service)] = 0;
+    // If we have no services, we can't render the chart properly
+    if (services.length === 0) {
+      console.warn('No services found in data - chart may not render');
+      // Return data with just the total count
+      return filteredData.map(item => {
+        try {
+          const formattedDate = format(parseISO(item.date), 'MMM d');
+          return {
+            date: formattedDate,
+            'Total': item.count || 0
+          };
+        } catch (e) {
+          console.error('Error formatting date:', item.date, e);
+          return null;
         }
-      });
-      
-      // Calculate Total as the sum of all services
-      const servicesSum = services.reduce((sum, service) => {
-        return sum + (result[getServiceDisplayName(service)] || 0);
-      }, 0);
-      
-      // Use the larger of the calculated sum or the reported total
-      result['Total'] = Math.max(item.count || 0, servicesSum);
-      
-      return result;
-    });
+      }).filter(item => item !== null);
+    }
+    
+    console.log('Formatting chart data with services:', services);
+    const chartData = filteredData.map(item => {
+      try {
+        const formattedDate = format(parseISO(item.date), 'MMM d');
+        const result: any = { date: formattedDate };
+        
+        services.forEach(service => {
+          if (item.by_service && item.by_service[service]) {
+            // Use actual data when available
+            result[getServiceDisplayName(service)] = item.by_service[service];
+          } else {
+            // Use zero for services with no data
+            result[getServiceDisplayName(service)] = 0;
+          }
+        });
+        
+        // Calculate Total as the sum of all services
+        const servicesSum = services.reduce((sum, service) => {
+          return sum + (result[getServiceDisplayName(service)] || 0);
+        }, 0);
+        
+        // Use the larger of the calculated sum or the reported total
+        result['Total'] = Math.max(item.count || 0, servicesSum);
+        
+        return result;
+      } catch (e) {
+        console.error('Error formatting chart item:', item, e);
+        return null;
+      }
+    }).filter(item => item !== null);
+    
+    console.log('Final chart data length:', chartData.length);
+    console.log('Sample chart data:', chartData.slice(0, 2));
+    
+    return chartData;
   };
   
   // Show a message when no data is available
@@ -389,6 +447,15 @@ export function PremiumAnalyticsDashboard() {
   const serviceTotals = calculateServiceTotals();
   const growth = calculateGrowth();
   const dailyAverage = calculateDailyAverage();
+  
+  // Log final state for debugging
+  console.log('Chart render state:', {
+    isLoading,
+    error,
+    chartDataLength: chartData.length,
+    serviceTotalsLength: serviceTotals.length,
+    apiUsageLength: apiUsage.length
+  });
 
   // Get colors for the chart
   const valueFormatter = (number: number) => 
@@ -556,21 +623,21 @@ export function PremiumAnalyticsDashboard() {
                   <ColorfulAreaChart
                     data={chartData}
                     xAxisKey="date"
-                    categories={serviceTotals.map(s => s.name)}
+                    categories={getServices().map(s => getServiceDisplayName(s))}
                   />
                 )}
                 {chartType === 'line' && (
                   <ColorfulLineChart
                     data={chartData}
                     xAxisKey="date"
-                    categories={serviceTotals.map(s => s.name)}
+                    categories={getServices().map(s => getServiceDisplayName(s))}
                   />
                 )}
                 {chartType === 'bar' && (
                   <ColorfulBarChart
                     data={chartData}
                     xAxisKey="date"
-                    categories={serviceTotals.map(s => s.name)}
+                    categories={getServices().map(s => getServiceDisplayName(s))}
                   />
                 )}
               </div>
